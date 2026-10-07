@@ -23,8 +23,15 @@
     irABio: 'Ir a biológica', cejaBio: 'Paso 3 · Biológica', verResultados: 'Ver resultados', cejaResultados: 'Paso 4 · Cierre',
     resultados: 'Resultados', guardarYVolver: 'Guardar y volver a la jornada', cierreJornada: 'Cierre de jornada',
     sincronizarAhora: 'Sincronizar ahora', compartirPaquete: 'Compartir paquete del día', descargarCsv: 'Descargar CSV para Excel',
-    criterioDerivacion: 'Criterio de derivación: [a definir por el equipo]'
+    criterioDerivacion: 'Criterio de derivación: [a definir por el equipo]',
+    responsable: 'la administradora', seccionAdministracion: 'Administración y respaldo', cejaImportar: 'Administración',
+    encuestadoresEntrevista: 'Encuestador/es de esta entrevista',
+    ayudaEncuestadores: 'Si son varios, escribí los nombres separados por «y».',
+    buscarParticipante: 'Buscar al participante',
+    ayudaBuscarParticipante: 'Alcanza con una parte: los últimos números del código (por ejemplo 44-4600), el número del ID (por ejemplo 3 o A1-0003) o los últimos 4 números del celular.',
+    idParaEntregar: 'Anotáselo o pedile que le saque una foto: con este ID se lo encuentra rápido en la próxima visita.'
   }, CFG.textos || {});
+  function mayuscula(t) { t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
   var PROYECTO = Object.assign({ nombre: 'Relevamiento', lugar: 'Corredor Bioceánico · Jujuy' }, CFG.proyecto || {});
   var PASOS = CFG.pasos || ['Identificación', 'Socio', 'Biológica', 'Resultados'];
   var RANGOS = Object.assign({ edad: [18, 99], peso: [35, 250], altura: [1.2, 2.2], perimetro: [50, 200], pas: [70, 260], glucemia: [20, 600] }, CFG.rangos || {});
@@ -335,13 +342,10 @@
 
   REGIONES.lista = listaRegistros;
   function listaRegistros() {
-    var f = hoy(), q = estado.buscar.trim().toLowerCase(), qDig = q.replace(/\D/g, '');
+    var f = hoy(), q = estado.buscar.trim();
     var lista = estado.registros.slice();
     if (q) {
-      lista = lista.filter(function (r) {
-        var cel = ((r.contacto && r.contacto.celular) || '').replace(/\D/g, '');
-        return (r.codigo || '').indexOf(q) >= 0 || (r.participante_id || '').toLowerCase().indexOf(q) >= 0 || (qDig.length >= 4 && cel.indexOf(qDig) >= 0);
-      });
+      lista = lista.filter(function (r) { return coincideParticipante(r, q); });
     } else if (!estado.verTodos) {
       lista = lista.filter(function (r) { return r.fecha === f; });
     }
@@ -386,21 +390,38 @@
         : r.codigo ? '<span class="ok-linea">' + ico('check', 18) + 'Código libre en este dispositivo</span>' : '<span class="ayuda">Completá orden, edad y código postal.</span>');
   };
 
+  /* Búsqueda tolerante: partes del código (con o sin guiones), número del ID o últimos dígitos del celular. */
+  function coincideParticipante(x, q) {
+    var qn = q.toLowerCase().replace(/[^a-z0-9]/g, ''), qd = q.replace(/\D/g, '');
+    if (!qn) return false;
+    var id = (x.participante_id || '').toLowerCase(), idn = id.replace(/[^a-z0-9]/g, '');
+    var numId = id ? id.split('-').pop().replace(/^0+/, '') : '';
+    var codDig = (x.codigo || '').replace(/\D/g, '');
+    var cel = ((x.contacto && x.contacto.celular) || '').replace(/\D/g, '');
+    if (/[a-z]/.test(qn)) {                                              // con letra: A1-0003, a10003, A1-3, a1 3
+      var partes = q.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+      if (partes.length === 2 && id.split('-')[0] === partes[0] && partes[1].replace(/^0+/, '') === numId) return true;
+      return idn.indexOf(qn) >= 0;
+    }
+    if (numId && qd.replace(/^0+/, '') === numId) return true;           // solo el número del ID: 3 o 0003
+    if (qd.length >= 2 && codDig.indexOf(qd) >= 0) return true;          // partes del código: 4600, 44-4600
+    if (qd.length >= 4 && cel.slice(-qd.length) === qd) return true;     // últimos números del celular
+    return false;
+  }
+
   REGIONES.buscarPart = function () {
-    var r = estado.actual, q = estado.buscarPart.trim().toLowerCase(), qd = q.replace(/\D/g, '');
+    var r = estado.actual, q = estado.buscarPart.trim();
     if (!q) return '';
     var vistos = {}, res = [];
-    estado.registros.forEach(function (x) {
+    estado.registros.slice().sort(function (a, b) { return (b.creado || '').localeCompare(a.creado || ''); }).forEach(function (x) {
       if (x.id === r.id || !x.participante_id || vistos[x.participante_id]) return;
-      var cel = ((x.contacto && x.contacto.celular) || '').replace(/\D/g, '');
-      if ((x.codigo || '').indexOf(q) >= 0 || x.participante_id.toLowerCase().indexOf(q) >= 0 || (qd.length >= 4 && cel.indexOf(qd) >= 0)) {
-        vistos[x.participante_id] = true; res.push(x);
-      }
+      if (coincideParticipante(x, q)) { vistos[x.participante_id] = true; res.push(x); }
     });
-    if (!res.length) return '<span class="ayuda">No aparece en este dispositivo. Si tiene su ID de una visita anterior, escribilo abajo.</span>';
-    return '<div class="lista">' + res.slice(0, 5).map(function (x) {
+    if (!res.length) return '<span class="ayuda">No aparece en este celular. Si tiene su ID de una visita anterior (por ejemplo en una foto), escribilo abajo.</span>';
+    return '<div class="lista">' + res.slice(0, 8).map(function (x) {
       return '<button type="button" class="registro" data-accion="vincular" data-valor="' + esc(x.id) + '"><span class="arriba"><span class="cod">' + esc(x.participante_id) +
-        '</span><span class="hora">' + esc(x.codigo) + ' · ' + fechaCorta(x.fecha) + '</span></span><span class="ayuda">Tocá para vincular este relevamiento</span></button>';
+        '</span><span class="hora">' + fechaCorta(x.fecha) + '</span></span><span class="ayuda">Código ' + esc(x.codigo) + ' · ' + esc(x.edad || '') + ' años' +
+        (x.encuestador ? ' · ' + esc(x.encuestador) : '') + (x.puesto ? ' · ' + esc(x.puesto) : '') + '</span><span class="ayuda" style="font-weight:700;color:var(--azul)">Tocá para vincular</span></button>';
     }).join('') + '</div>';
   };
 
@@ -417,11 +438,14 @@
       '</div><span class="ayuda">El orden se sugiere solo: siguiente número libre del rango de este dispositivo (' + R.pad(aj.ordenDesde, 3) + '–' + R.pad(aj.ordenHasta, 3) + ').</span>' +
       region('codigo', REGIONES.codigo()) + '</section>';
 
+    html += campoTexto('reg.encuestador', T.encuestadoresEntrevista, r.encuestador, { ayuda: T.ayudaEncuestadores, placeholder: 'Nombre y apellido' });
+
     html += '<fieldset class="pregunta"><legend>' + esc(T.participoAntes) + '</legend>' +
       grupoOpciones('reg.previo', ['Sí', 'No'], r.previo, false, 'grilla') + '</fieldset>';
     if (r.previo === 'Sí') {
-      html += '<div class="campo"><label for="buscar-part">Buscar por celular, código o ID</label>' +
-        '<input class="entrada" id="buscar-part" type="search" data-buscar-part="1" value="' + esc(estado.buscarPart) + '" autocomplete="off"></div>' +
+      html += '<div class="campo"><label for="buscar-part">' + esc(T.buscarParticipante) + '</label>' +
+        '<input class="entrada" id="buscar-part" type="search" data-buscar-part="1" value="' + esc(estado.buscarPart) + '" autocomplete="off" aria-describedby="buscar-part-ayuda">' +
+        '<span class="ayuda" id="buscar-part-ayuda">' + esc(T.ayudaBuscarParticipante) + '</span></div>' +
         region('buscarPart', REGIONES.buscarPart()) +
         campoTexto('reg.participante_id', 'ID de participante', r.participante_id, { mono: true, placeholder: 'p. ej. A1-0007' });
     } else {
@@ -605,6 +629,11 @@
   function vResultados() {
     var r = estado.actual, b = r.bio || {}, c = R.calcular(r), fr = c.findrisk, fh = c.framingham;
     var html = '<main class="pantalla">' + barra('#/bio/' + r.id + '/3', T.cejaResultados, T.resultados, placaChica(r)) + pasosRelevamiento(r, 3);
+    if (r.participante_id) {
+      html += '<section class="tarjeta" style="border:2px solid var(--tinta);align-items:center;text-align:center">' +
+        '<h2 class="seccion">ID del participante</h2><span style="font-family:var(--f-mono);font-size:40px;font-weight:500;letter-spacing:.04em">' + esc(r.participante_id) + '</span>' +
+        '<span class="ayuda">' + esc(T.idParaEntregar) + '</span></section>';
+    }
 
     html += '<section class="tarjeta"><h2 class="seccion">FINDRISK · riesgo de diabetes a 10 años</h2>';
     if (fr.aplica === false) html += '<p>No corresponde: ' + esc(fr.motivo) + '.</p>';
@@ -689,7 +718,7 @@
       (estado.sincronizando ? 'Sincronizando…' : esc(T.sincronizarAhora)) + '</button>' + region('estadoSync', REGIONES.estadoSync()) + '</section>';
 
     html += '<section class="tarjeta discontinua"><h2 class="seccion" style="color:var(--tinta-2)">Sin señal</h2>' +
-      '<p>Generá un archivo ' + (aj.clave ? 'cifrado' : '<b>sin cifrar</b> (falta la clave del equipo)') + ' con lo relevado para mandar por WhatsApp, correo o Drive. La coordinación lo importa y se descartan duplicados.</p>' +
+      '<p>Generá un archivo ' + (aj.clave ? 'cifrado' : '<b>sin cifrar</b> (falta la clave del equipo)') + ' con lo relevado para mandar por WhatsApp, correo o Drive. ' + esc(mayuscula(T.responsable)) + ' lo importa y se descartan duplicados.</p>' +
       '<button type="button" class="btn" data-accion="paquete">' + ico('compartir', 22) + esc(T.compartirPaquete) + '</button>' +
       '<button type="button" class="btn chico" data-accion="csv">' + ico('bajar', 18) + esc(T.descargarCsv) + '</button></section>' +
       '<span class="ayuda empujar-abajo" style="text-align:center">' +
@@ -708,13 +737,13 @@
       '<section class="tarjeta"><h2 class="seccion">Equipo y dispositivo</h2>' +
       '<div class="grilla-campos">' + campo('equipo', 'Equipo', { placeholder: 'A' }) + campo('dispositivo', 'N° de dispositivo', { inputmode: 'numeric' }) + '</div>' +
       '<div class="grilla-campos">' + campo('ordenDesde', 'Orden desde', { inputmode: 'numeric' }) + campo('ordenHasta', 'Orden hasta', { inputmode: 'numeric' }) + '</div>' +
-      '<span class="ayuda">Cada dispositivo usa su propio rango (p. ej. 001–199, 200–399) para que no se repitan códigos.</span>' +
-      campo('encuestador', 'Encuestador/a', { placeholder: 'Nombre o iniciales' }) + campo('puesto', 'Puesto o lugar de relevamiento', { placeholder: 'p. ej. Susques, RN 52' }) + '</section>' +
+      '<span class="ayuda">Si cada integrante usa un solo celular, el N° de dispositivo queda en 1. Cambia solo si la misma persona carga desde un segundo aparato: ahí va 2 y otro rango de orden, para que no se repitan códigos ni IDs.</span>' +
+      campo('encuestador', 'Encuestador/a habitual', { placeholder: 'Nombre o iniciales', ayuda: 'Aparece ya escrito en cada entrevista nueva; ahí se puede cambiar.' }) + campo('puesto', 'Puesto o lugar de relevamiento', { placeholder: 'p. ej. Susques, RN 52' }) + '</section>' +
       '<section class="tarjeta"><h2 class="seccion">Planilla de Google</h2>' +
       campoTexto('aj.url', 'Dirección de la aplicación web (Apps Script)', aj.url, { area: true }) +
       campoTexto('aj.clave', 'Clave del equipo', aj.clave, { tipo: 'password', ayuda: 'La misma en todos los dispositivos y en el script. Cifra los paquetes.' }) +
       '<button type="button" class="btn chico" data-accion="probar">' + ico('senal', 18) + 'Probar conexión</button>' + region('conexion', REGIONES.conexion()) + '</section>' +
-      '<section class="tarjeta"><h2 class="seccion">Coordinación y respaldo</h2>' +
+      '<section class="tarjeta"><h2 class="seccion">' + esc(T.seccionAdministracion) + '</h2>' +
       '<a class="btn chico" href="#/importar">' + ico('subir', 18) + 'Importar paquetes de otros dispositivos</a>' +
       '<button type="button" class="btn chico" data-accion="respaldo">' + ico('bajar', 18) + 'Respaldo completo de este dispositivo</button>' +
       '<button type="button" class="btn chico" data-accion="contactos">' + ico('bajar', 18) + 'Descargar contactos (CSV)</button>' +
@@ -736,7 +765,7 @@
   };
 
   function vImportar() {
-    return '<main class="pantalla">' + barra('#/ajustes', 'Coordinación', 'Importar paquetes') +
+    return '<main class="pantalla">' + barra('#/ajustes', T.cejaImportar, 'Importar paquetes') +
       '<p style="margin:0">Elegí los paquetes que mandaron los equipos (archivos .txt o .json). Se unen con lo que ya hay en esta computadora; si un relevamiento llega dos veces, queda la versión más reciente.</p>' +
       '<label class="btn primario" for="archivos-paquete" style="cursor:pointer">' + ico('subir', 22) + 'Elegir paquetes</label>' +
       '<input type="file" id="archivos-paquete" accept=".txt,.json,text/plain,application/json" multiple class="oculto-visual">' +
