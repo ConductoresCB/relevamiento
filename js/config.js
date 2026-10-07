@@ -20,7 +20,7 @@
   raiz.CONFIG = {
 
     // Versión de la app. Subila con cada cambio que publiques.
-    versionApp: '1.1.0',
+    versionApp: '1.2.0',
 
     proyecto: {
       nombre: 'Relevamiento',                 // aparece en la pestaña del navegador
@@ -65,7 +65,21 @@
       sincronizarAhora: 'Sincronizar ahora',
       compartirPaquete: 'Compartir paquete del día',
       descargarCsv: 'Descargar CSV para Excel',
-      criterioDerivacion: 'Criterio de derivación: [a definir por el equipo]'
+      criterioDerivacion: 'Criterio de derivación: [a definir por el equipo]',
+
+      // Quién recibe los paquetes y administra la planilla (aparece en Cierre y en Ajustes).
+      responsable: 'la administradora',
+      seccionAdministracion: 'Administración y respaldo',
+      cejaImportar: 'Administración',
+
+      // Pantalla de identificación: quién hace esta entrevista (puede cambiar de una a otra).
+      encuestadoresEntrevista: 'Encuestador/es de esta entrevista',
+      ayudaEncuestadores: 'Si son varios, escribí los nombres separados por «y».',
+
+      // Búsqueda del participante de una visita anterior.
+      buscarParticipante: 'Buscar al participante',
+      ayudaBuscarParticipante: 'Alcanza con una parte: los últimos números del código (por ejemplo 44-4600), el número del ID (por ejemplo 3 o A1-0003) o los últimos 4 números del celular.',
+      idParaEntregar: 'Anotáselo o pedile que le saque una foto: con este ID se lo encuentra rápido en la próxima visita.'
     },
 
     // Recomendación que se muestra según el riesgo de Framingham (texto del protocolo).

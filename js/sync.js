@@ -1,6 +1,6 @@
 /*
  * sync.js — Envío a la planilla de Google (Apps Script), paquetes del día cifrados e
- * importación de paquetes en la computadora de coordinación.
+ * importación de paquetes en la computadora de la administradora.
  */
 (function (raiz) {
   'use strict';
