@@ -20,7 +20,7 @@
   raiz.CONFIG = {
 
     // Versión de la app. Subila con cada cambio que publiques.
-    versionApp: '1.3.0',
+    versionApp: '1.3.1',
 
     proyecto: {
       nombre: 'Relevamiento',                 // aparece en la pestaña del navegador
@@ -49,7 +49,7 @@
       identificacion: 'Identificación',
       codigoIdentificacion: 'Código de identificación',
       participoAntes: '¿Participó en un relevamiento anterior?',
-      datosContacto: 'Datos de contacto',
+      datosContacto: 'Contacto del camionero entrevistado',
       consentimiento: 'Leyó y aceptó el consentimiento informado.',
       comparteApp: 'Acepta que sus resultados se vean en la app de camioneros.',
       continuarSocio: 'Continuar con sociodemográfica',
