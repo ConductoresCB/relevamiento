@@ -745,6 +745,7 @@
       '<button type="button" class="btn chico" data-accion="probar">' + ico('senal', 18) + 'Probar conexión</button>' + region('conexion', REGIONES.conexion()) + '</section>' +
       '<section class="tarjeta"><h2 class="seccion">' + esc(T.seccionAdministracion) + '</h2>' +
       '<a class="btn chico" href="#/importar">' + ico('subir', 18) + 'Importar paquetes de otros dispositivos</a>' +
+      '<a class="btn chico" href="tablero/">' + ico('seguir', 18) + 'Abrir el tablero de análisis</a>' +
       '<button type="button" class="btn chico" data-accion="respaldo">' + ico('bajar', 18) + 'Respaldo completo de este dispositivo</button>' +
       '<button type="button" class="btn chico" data-accion="contactos">' + ico('bajar', 18) + 'Descargar contactos (CSV)</button>' +
       (estado.instalar ? '<button type="button" class="btn chico azul-claro" data-accion="instalar">Instalar la app</button>' : '') + '</section>' +
