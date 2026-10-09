@@ -395,7 +395,11 @@
       notaPie: 'FINDRISK excluye a quienes tienen diagnóstico de diabetes.' }));
     html += tarjeta(graficoFrecuencias('fh', vfh, F, { titulo: 'Riesgo cardiovascular a 10 años (Framingham con IMC)', encabezado: 'Categoría',
       vacio: 'Ningún ' + nombreUnidad(1) + ' tiene todos los datos para Framingham. ' + faltantes(F, '_fh'), notaPie: 'Framingham con IMC: tablas del protocolo; edades de 20 a 79 años.' }));
-    html += tarjeta(graficoFrecuencias('imc', D.variable('imc_cat'), F, { titulo: 'Índice de masa corporal (OMS)', encabezado: 'Categoría', vacio: 'No hay peso y altura medidos con los filtros actuales.' }));
+    var conImc = F.filter(function (r) { return typeof r.b_imc === 'number'; }).length;
+    var con25 = F.filter(function (r) { return r.imc_mayor25; }).length;
+    html += conImc >= 0.8 * con25 ? tarjeta(graficoFrecuencias('imc', D.variable('imc_cat'), F, { titulo: 'Índice de masa corporal (OMS)', encabezado: 'Categoría' }))
+      : tarjeta(graficoFrecuencias('imc', D.variable('imc_mayor25'), F, { titulo: 'IMC de 25 o más', encabezado: 'IMC ≥ 25',
+        sub: 'Sin peso y altura medidos: se usa el dato registrado (mayor o menor que 25)', vacio: 'No hay IMC con los filtros actuales.' }));
     html += tarjeta(graficoFrecuencias('punto', D.variable('puesto'), F, { titulo: 'Punto de relevamiento', lectura: false }));
     html += tarjeta(graficoFrecuencias('pais', D.variable('p01_nac_pais'), F, { titulo: 'Lugar de nacimiento' }));
     html += tarjeta(graficoMeses());
@@ -700,8 +704,8 @@
         var r = f.r;
         return '<tr><td class="mono">' + esc(r.participante_id) + '</td><td>' + esc(r.puesto || '') + '</td><td class="n">' + num(r.visitas) + '</td><td class="n">' + esc(fechaCorta(r.fecha)) +
           '</td><td class="n">' + (typeof r.edad === 'number' ? num(r.edad) : '—') + '</td><td class="n"><span class="barra-mini" style="width:' + Math.round(f.completo * 0.5) + 'px"></span>' + num(f.completo) + ' %</td>' +
-          '<td class="n">' + (typeof r.b_imc === 'number' ? num(r.b_imc, 1) : '—') + '</td><td class="n">' + (r.fr_categoria ? esc(r.fr_categoria) + ' (' + r.fr_puntos + ')' : '—') +
-          '</td><td>' + (r.fh_categoria ? esc(r.fh_categoria) + ' (' + esc(r.fh_riesgo) + ' %)' : '—') + '</td><td class="n">' + (typeof r.g_resultado_mgdl === 'number' ? num(r.g_resultado_mgdl) : '—') +
+          '<td class="n">' + (typeof r.b_imc === 'number' ? num(r.b_imc, 1) : '—') + '</td><td class="n">' + (r.fr_categoria ? esc(r.fr_categoria) + (r.fr_puntos !== undefined ? ' (' + r.fr_puntos + ')' : '') : '—') +
+          '</td><td>' + (r.fh_categoria ? esc(r.fh_categoria) + (r.fh_riesgo ? ' (' + esc(r.fh_riesgo) + ' %)' : '') : '—') + '</td><td class="n">' + (typeof r.g_resultado_mgdl === 'number' ? num(r.g_resultado_mgdl) : '—') +
           '</td><td>' + esc(String(r.origen || '').replace(/; /g, ' + ')) + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
     // completitud por sección
