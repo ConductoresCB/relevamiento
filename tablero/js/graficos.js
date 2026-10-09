@@ -163,6 +163,11 @@
     var W = o.ancho || ANCHO, x0 = 44, x1 = W - 8, y0 = 14, alto = 230, yBase = y0 + alto - 40;
     var maxV = Math.max.apply(null, items.map(function (i) { return i.n; }).concat([1]));
     var eje = raiz.Estadistica.ejeLindo(0, maxV, 4), cuerpo = '';
+    if (eje.paso % 1) { // los conteos van de a números enteros
+      var paso = Math.max(1, Math.ceil(eje.paso)), tope = Math.ceil(maxV / paso) * paso;
+      eje = { min: 0, max: tope, paso: paso, marcas: [] };
+      for (var q = 0; q <= tope; q += paso) eje.marcas.push(q);
+    }
     if (eje.paso < 1) { // los conteos van de a uno
       eje = { min: 0, max: Math.max(1, Math.ceil(maxV)), paso: 1, marcas: [] };
       for (var k = 0; k <= eje.max; k++) eje.marcas.push(k);

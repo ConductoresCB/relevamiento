@@ -44,6 +44,7 @@
     { id: 'grupo_edad', texto: 'Grupo de edad', opciones: ['18 a 29', '30 a 39', '40 a 49', '50 a 59', '60 o más'] },
     { id: 'imc_cat', texto: 'IMC según OMS', opciones: ['Bajo peso (<18,5)', 'Normal (18,5 a 24,9)', 'Sobrepeso (25 a 29,9)', 'Obesidad (30 o más)'] },
     { id: 'pas_140', texto: 'Presión sistólica de 140 mmHg o más', opciones: ['Sí', 'No'] },
+    { id: 'imc_mayor25', texto: 'IMC de 25 o más', opciones: ['Sí', 'No'] },
     { id: 'antiguedad_cat', texto: 'Años como chofer (agrupado)', opciones: ['Menos de 5', '5 a 14', '15 a 24', '25 o más'] },
     { id: 'horas_sin_parar_cat', texto: 'Horas de conducción sin parar (agrupado)', opciones: ['Hasta 2 h', 'Más de 2 a 4 h', 'Más de 4 a 6 h', 'Más de 6 h'] },
     { id: 'sueno_cat', texto: 'Horas de sueño por día (agrupado)', opciones: ['Menos de 6 h', '6 a 7 h', '8 h o más'] }
@@ -73,7 +74,8 @@
     b_antec_fam_dbt: 'Antecedentes familiares de diabetes', b_fuma: 'Fuma tabaco', g_resultado_mgdl: 'Glucemia periférica', g_ayuno_min: 'Minutos de ayuno',
     fr_puntos: 'Puntaje FINDRISK', fr_categoria: 'Riesgo FINDRISK', fh_puntos: 'Puntaje Framingham', fh_categoria: 'Riesgo Framingham',
     edad: 'Edad', puesto: 'Punto de relevamiento', origen: 'Planilla de origen', equipo: 'Equipo', encuestador: 'Encuestador/es',
-    fecha: 'Fecha', estado: 'Estado del relevamiento', visitas: 'Visitas por participante', pas_140: 'Presión sistólica ≥ 140 mmHg'
+    fecha: 'Fecha', estado: 'Estado del relevamiento', visitas: 'Visitas por participante', pas_140: 'Presión sistólica ≥ 140 mmHg',
+    imc_mayor25: 'IMC de 25 o más'
   };
 
   var DIC = null, POR_ID = {};
@@ -296,6 +298,7 @@
     if (typeof e === 'number') r.grupo_edad = e < 30 ? '18 a 29' : e < 40 ? '30 a 39' : e < 50 ? '40 a 49' : e < 60 ? '50 a 59' : '60 o más';
     var i = r.b_imc;
     if (typeof i === 'number') r.imc_cat = i < 18.5 ? 'Bajo peso (<18,5)' : i < 25 ? 'Normal (18,5 a 24,9)' : i < 30 ? 'Sobrepeso (25 a 29,9)' : 'Obesidad (30 o más)';
+    if (typeof i === 'number') r.imc_mayor25 = i >= 25 ? 'Sí' : 'No'; // si no hay IMC medido, queda el registrado en la planilla
     if (typeof r.b_pas_mmhg === 'number') r.pas_140 = r.b_pas_mmhg >= 140 ? 'Sí' : 'No';
     var a = r.p10_anios_chofer;
     if (typeof a === 'number') r.antiguedad_cat = a < 5 ? 'Menos de 5' : a < 15 ? '5 a 14' : a < 25 ? '15 a 24' : '25 o más';
@@ -357,10 +360,16 @@
       c.fecha = fechas.length ? fechas[fechas.length - 1] : '';
       c.fecha_primera = fechas.length ? fechas[0] : '';
       // los riesgos se recalculan con los datos unidos (no se arrastran los de una visita)
-      ['fr_puntos', 'fr_categoria', 'fr_probabilidad', 'fh_puntos', 'fh_riesgo', 'fh_categoria', 'b_imc'].forEach(function (x) { delete c[x]; });
+      var RIESGOS = ['fr_puntos', 'fr_categoria', 'fr_probabilidad', 'fh_puntos', 'fh_riesgo', 'fh_categoria'];
+      var registrados = {}; // resultados ya registrados en alguna visita (p. ej. planilla previa sin datos crudos)
+      RIESGOS.forEach(function (x) { if (c[x] !== undefined) registrados[x] = c[x]; });
+      RIESGOS.concat(['b_imc']).forEach(function (x) { delete c[x]; });
       var ultImc = vis.map(function (v) { return v.b_imc; }).filter(function (x) { return typeof x === 'number'; });
       if (ultImc.length) c.b_imc = ultImc[ultImc.length - 1];
-      return recalcular(c);
+      recalcular(c);
+      if (!c.fr_categoria && registrados.fr_categoria) ['fr_puntos', 'fr_categoria', 'fr_probabilidad'].forEach(function (x) { if (registrados[x] !== undefined) c[x] = registrados[x]; });
+      if (!c.fh_categoria && registrados.fh_categoria) ['fh_puntos', 'fh_riesgo', 'fh_categoria'].forEach(function (x) { if (registrados[x] !== undefined) c[x] = registrados[x]; });
+      return c;
     });
   }
 
