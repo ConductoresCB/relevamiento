@@ -121,7 +121,7 @@
   }
 
   function etiquetaSugerida(nombre, filas) {
-    var previa = filas.length && filas.every(function (r) { return r.equipo === 'H' || /previa/i.test(r.version_instrumento || ''); });
+    var previa = filas.length && filas.every(function (r) { return r.equipo === 'P' || /previa/i.test(r.version_instrumento || ''); });
     if (previa) return 'Previa';
     var n = estado.fuentes.filter(function (f) { return !f.ejemplo; }).length;
     return n ? 'Planilla ' + (n + 1) : 'Actual';
@@ -691,7 +691,7 @@
       '<div class="kpi"><span class="rotulo">Participantes</span><span class="valor">' + num(filas.length) + '</span><span class="detalle">con los filtros actuales</span></div>' +
       '<div class="kpi"><span class="rotulo">Completitud promedio</span><span class="valor">' + pct(promedio) + '</span><span class="detalle">de ' + ctl.length + ' preguntas y mediciones</span></div>' +
       '<div class="kpi"><span class="rotulo">Sin ninguna medición</span><span class="valor">' + num(sinBio) + '</span><span class="detalle">sin peso, altura, perímetro, presión ni glucemia</span></div></div>';
-    html += '<div class="tarjeta"><div class="form-fila"><label class="campo" style="max-width:260px"><span>Buscar por ID</span><input class="entrada" data-campo="participantes.buscar" value="' + esc(op.buscar) + '" placeholder="p. ej. H1-0014"></label>' +
+    html += '<div class="tarjeta"><div class="form-fila"><label class="campo" style="max-width:260px"><span>Buscar por ID</span><input class="entrada" data-campo="participantes.buscar" value="' + esc(op.buscar) + '" placeholder="p. ej. P1-0014"></label>' +
       '<button type="button" class="btn sec chico" data-accion="csv-participantes">Descargar esta tabla (CSV)</button></div>' +
       '<p class="sub">Los riesgos se calculan con los datos de todas las visitas de cada persona. El nombre no aparece acá: está solo en la hoja privada «Participantes» de la planilla previa.</p>' +
       '<div class="desplazable"><table class="datos"><thead><tr>' + th('id', 'ID') + th('punto', 'Punto') + th('visitas', 'Visitas') + th('fecha', 'Última visita') +
@@ -783,7 +783,7 @@
       (estado.fuentes.length ? '<button type="button" class="btn sec" data-accion="csv-filtrado">Descargar datos filtrados (CSV)</button>' : '') + '</div></div>';
     html += '<div class="tarjeta"><h3>Cómo se unen las planillas</h3><ul class="lectura">' +
       '<li>Cada relevamiento tiene un <strong>id</strong> único: si aparece en dos planillas, cuenta una sola vez.</li>' +
-      '<li>Las visitas de una misma persona se unen por su <strong>ID de participante</strong> (por ejemplo H1-0014): en la vista por participantes, cada dato toma el valor más reciente que no esté vacío.</li>' +
+      '<li>Las visitas de una misma persona se unen por su <strong>ID de participante</strong> (por ejemplo P1-0014): en la vista por participantes, cada dato toma el valor más reciente que no esté vacío.</li>' +
       '<li>FINDRISK, Framingham e IMC se recalculan con las mismas fórmulas de la app, usando los datos unidos.</li>' +
       '<li>Variables agregadas para analizar: grupo de edad, IMC según OMS, presión ≥ 140, años como chofer, horas sin parar y horas de sueño agrupadas.</li></ul></div>';
     return html;
