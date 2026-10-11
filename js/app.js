@@ -259,7 +259,10 @@
     var conMarca = true;
     if (disposicion === 'linea' || disposicion === 'grilla') {
       conMarca = false;
-      clase += opciones.length === 2 ? ' grilla-2' : opciones.length === 3 ? ' grilla-3' : opciones.length === 6 ? ' grilla-3' : ' en-linea';
+      // 7 opciones con una primera distinta («Ninguna»): esa va sola arriba y las otras 6 en una grilla pareja de 3 × 2
+      var primeraSola = opciones.length === 7 && isNaN(Number(opciones[0]));
+      clase += opciones.length === 2 ? ' grilla-2' : opciones.length === 3 || opciones.length === 6 ? ' grilla-3'
+        : primeraSola ? ' grilla-3 primera-sola' : ' en-linea';
     }
     return '<div class="' + clase + '">' + opciones.map(function (o) {
       return botonOpcion(ruta, o, sel.indexOf(o) >= 0, multiple, conMarca);
