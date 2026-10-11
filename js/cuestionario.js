@@ -14,10 +14,12 @@
   var SI_NO = ['Sí', 'No'];
   var FRECUENCIA = ['Diariamente', 'Una vez a la semana', '2 veces por semana', '3 veces por semana',
     'Quincenalmente', 'Una vez al mes', 'Otro'];
-  var CANTIDAD = ['1', '2', '3', '4', '5', 'Más de 5'];
+  // 1.4: se agrega «Ninguna» (antes no había opción para quien vive solo o no tiene personas a cargo)
+  var CONVIVE = ['Ninguna (vive solo)', '1', '2', '3', '4', '5', 'Más de 5'];
+  var A_CARGO = ['Ninguna', '1', '2', '3', '4', '5', 'Más de 5'];
 
   var CUESTIONARIO = {
-    version: '2026-10-v2', // v2 (app 1.4): agrega la presión diastólica en la biológica
+    version: '2026-10-v2', // v2 (app 1.4): diastólica en la biológica; «Ninguna» en las preguntas 4 y 5; la 8 pregunta el país de la licencia
     titulo: 'Encuesta sociodemográfica · Conductores de camiones del Corredor Bioceánico - Jujuy',
     secciones: [
       {
@@ -40,8 +42,8 @@
       {
         id: 's2', titulo: 'Hogar', preguntas: [
           { n: 3, id: 'p03_pareja', texto: '¿Está actualmente en pareja?', tipo: 'unica', opciones: SI_NO },
-          { n: 4, id: 'p04_convive', texto: 'Cantidad de personas con que convive', tipo: 'unica', opciones: CANTIDAD, enLinea: true },
-          { n: 5, id: 'p05_a_cargo', texto: 'Cantidad de personas que tiene a cargo', tipo: 'unica', opciones: CANTIDAD, enLinea: true }
+          { n: 4, id: 'p04_convive', texto: 'Cantidad de personas con que convive', tipo: 'unica', opciones: CONVIVE, enLinea: true },
+          { n: 5, id: 'p05_a_cargo', texto: 'Cantidad de personas que tiene a cargo', tipo: 'unica', opciones: A_CARGO, enLinea: true }
         ]
       },
       {
@@ -52,15 +54,10 @@
           { n: 7, id: 'p07_idiomas_habla', texto: '¿Qué idioma(s) habla?', tipo: 'multiple',
             opciones: ['Español', 'Guaraní', 'Portugués', 'Inglés', 'Otro'],
             detalles: { 'Otro': { id: 'p07_otro', etiqueta: 'Especificar' } } },
-          { n: 8, id: 'p08_licencia', texto: 'Categoría de licencia profesional que posee', tipo: 'multiple',
+          // 1.4: se pregunta dónde se emitió la licencia, no la categoría (pedido del equipo)
+          { n: 8, id: 'p08_licencia', texto: '¿En qué país obtuvo su licencia de conducir profesional?', tipo: 'multiple',
             opciones: ['Argentina', 'Brasil', 'Chile', 'Paraguay', 'Otro'],
-            detalles: {
-              'Argentina': { id: 'p08_lic_ar', etiqueta: 'Categoría (Argentina)' },
-              'Brasil': { id: 'p08_lic_br', etiqueta: 'Categoría (Brasil)' },
-              'Chile': { id: 'p08_lic_cl', etiqueta: 'Categoría (Chile)' },
-              'Paraguay': { id: 'p08_lic_py', etiqueta: 'Categoría (Paraguay)' },
-              'Otro': { id: 'p08_lic_otro', etiqueta: 'País y categoría' }
-            } }
+            detalles: { 'Otro': { id: 'p08_lic_otro', etiqueta: '¿En qué país?' } } }
         ]
       },
       {
