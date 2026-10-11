@@ -768,9 +768,9 @@
       '<p class="nota-privacidad">Los archivos se leen en este navegador y no se suben a ningún servidor. Al cerrar la pestaña, se borran de acá.</p>' +
       '<p class="sub"><strong>Planilla de Google:</strong> Archivo › Descargar › Microsoft Excel (.xlsx) y cargala acá. <strong>Planilla previa:</strong> el archivo Tablero_previo_entrevistas.xlsx.</p></div>';
     if (window.claude) html += '<div class="tarjeta"><h3>Leer directo de la planilla de Google</h3><p class="lectura">Esta opción funciona en el tablero publicado en GitHub (la misma dirección de la app, terminada en <span class="mono">/tablero/</span>). Acá podés cargar la planilla descargada como Excel.</p></div>';
-    else html += '<div class="tarjeta"><h3>Leer directo de la planilla de Google</h3><p class="sub">Necesita el script de la planilla 1.4. Usa la misma dirección que la app y la <strong>clave de lectura</strong>, que tiene solo la administración (no es la clave de los celulares).</p>' +
+    else html += '<div class="tarjeta"><h3>Leer directo de la planilla de Google</h3><p class="sub">Necesita el script de la planilla 1.4. Usa la misma dirección que la app y la clave del equipo, salvo que la administración haya definido una <strong>clave de lectura</strong> aparte.</p>' +
       '<label class="campo" style="max-width:none"><span>Dirección de la aplicación web (Apps Script)</span><input class="entrada" data-campo="conexion.url" value="' + esc(c.url) + '" placeholder="https://script.google.com/macros/s/…/exec"></label>' +
-      '<label class="campo" style="max-width:none"><span>Clave de lectura</span><input class="entrada" type="password" autocomplete="off" data-campo="conexion.clave" value="' + esc(c.clave) + '"></label>' +
+      '<label class="campo" style="max-width:none"><span>Clave (del equipo o de lectura)</span><input class="entrada" type="password" autocomplete="off" data-campo="conexion.clave" value="' + esc(c.clave) + '"></label>' +
       '<label class="casilla"><input type="checkbox" data-campo="conexion.recordar"' + (c.recordar ? ' checked' : '') + '> Recordar la clave en esta computadora (solo si es tu computadora personal)</label>' +
       '<div class="form-fila"><button type="button" class="btn" data-accion="leer-google">Leer la planilla</button></div></div>';
     html += '</div>';
