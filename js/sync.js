@@ -48,35 +48,51 @@
     }, Promise.resolve()).then(function () { return confirmados; });
   }
 
-  /* ---------- Cifrado de paquetes (AES-GCM con clave derivada de la clave del equipo) ---------- */
+  /* ---------- Cifrado de paquetes ----------
+   * Formato 2 (app 1.4): AES-GCM de 256 bits (Web Crypto del navegador, sin criptografía propia) con una clave
+   * derivada de la clave del equipo por PBKDF2-HMAC-SHA256 con 600 000 iteraciones (OWASP 2023), sal aleatoria
+   * de 16 bytes e IV aleatorio de 12 bytes, nuevos en cada paquete. La cabecera visible (equipo, dispositivo,
+   * cantidad, fecha) va como dato asociado: si alguien la modifica, el paquete no abre.
+   * Formato 1 (hasta 1.3): 150 000 iteraciones y cabecera sin autenticar. Se sigue pudiendo abrir.
+   */
+  var ITERACIONES = 600000, ITERACIONES_V1 = 150000;
+
   function aBase64(bytes) {
     if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
     var s = ''; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
     return btoa(s);
   }
   function deBase64(txt) {
+    if (typeof txt !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(txt)) throw new Error('base64 inválido');
     if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(txt, 'base64'));
     var s = atob(txt), b = new Uint8Array(s.length);
     for (var i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
     return b;
   }
+  function utf8(t) { return new TextEncoder().encode(t); }
 
-  function derivarClave(clave, sal) {
-    var enc = new TextEncoder();
-    return subtle.importKey('raw', enc.encode(clave), 'PBKDF2', false, ['deriveKey']).then(function (base) {
-      return subtle.deriveKey({ name: 'PBKDF2', salt: sal, iterations: 150000, hash: 'SHA-256' },
+  function derivarClave(clave, sal, iteraciones) {
+    return subtle.importKey('raw', utf8(clave), 'PBKDF2', false, ['deriveKey']).then(function (base) {
+      return subtle.deriveKey({ name: 'PBKDF2', salt: sal, iterations: iteraciones, hash: 'SHA-256' },
         base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
     });
   }
 
+  /* Cabecera que viaja sin cifrar pero autenticada (dato asociado de AES-GCM). */
+  function cabecera(p) {
+    return JSON.stringify({ tipo: p.tipo, version: p.version, generado: p.generado, equipo: p.equipo,
+      dispositivo: p.dispositivo, cantidad: p.cantidad, iteraciones: p.iteraciones });
+  }
+
+  /* Sin clave no se genera ningún archivo: desde 1.4 no hay paquetes sin cifrar. */
   function armarPaquete(registros, meta, clave) {
-    var cuerpo = JSON.stringify(registros);
-    var paquete = { tipo: 'paquete-relevamiento', version: 1, generado: new Date().toISOString(),
-      equipo: meta.equipo, dispositivo: meta.dispositivo, cantidad: registros.length };
-    if (!clave) { paquete.cifrado = false; paquete.datos = registros; return Promise.resolve(JSON.stringify(paquete)); }
+    if (!clave) return Promise.reject(new Error('Falta la clave del equipo en Ajustes: sin clave no se genera el archivo'));
+    var paquete = { tipo: 'paquete-relevamiento', version: 2, generado: new Date().toISOString(),
+      equipo: meta.equipo, dispositivo: meta.dispositivo, cantidad: registros.length,
+      iteraciones: (meta && meta.iteraciones) || ITERACIONES };
     var sal = getRandom(16), iv = getRandom(12);
-    return derivarClave(clave, sal).then(function (k) {
-      return subtle.encrypt({ name: 'AES-GCM', iv: iv }, k, new TextEncoder().encode(cuerpo));
+    return derivarClave(clave, sal, paquete.iteraciones).then(function (k) {
+      return subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: utf8(cabecera(paquete)) }, k, utf8(JSON.stringify(registros)));
     }).then(function (cifrado) {
       paquete.cifrado = true; paquete.sal = aBase64(sal); paquete.iv = aBase64(iv);
       paquete.datos = aBase64(new Uint8Array(cifrado));
@@ -86,31 +102,68 @@
 
   function abrirPaquete(texto, clave) {
     var p;
-    try { p = JSON.parse(texto); } catch (e) { return Promise.reject(new Error('El archivo no es un paquete válido')); }
+    try { p = JSON.parse(texto); } catch (e) { return Promise.reject(new Error('El archivo está dañado o incompleto: no se puede leer')); }
     if (!p || p.tipo !== 'paquete-relevamiento') return Promise.reject(new Error('El archivo no es un paquete de relevamiento'));
-    if (!p.cifrado) return Promise.resolve({ meta: p, registros: p.datos || [] });
+    if (!p.cifrado) return Promise.reject(new Error('El paquete no está cifrado: por seguridad no se importa. Pedí que lo generen de nuevo con la clave del equipo cargada'));
     if (!clave) return Promise.reject(new Error('El paquete está cifrado: cargá la clave del equipo en Ajustes'));
-    return derivarClave(clave, deBase64(p.sal)).then(function (k) {
-      return subtle.decrypt({ name: 'AES-GCM', iv: deBase64(p.iv) }, k, deBase64(p.datos));
-    }).then(function (plano) {
-      return { meta: p, registros: JSON.parse(new TextDecoder().decode(plano)) };
-    }, function () { throw new Error('No se pudo abrir: la clave del equipo no coincide'); });
+    var v2 = Number(p.version) >= 2;
+    var iter = v2 ? Number(p.iteraciones) : ITERACIONES_V1;
+    if (!(iter >= 100000 && iter <= 5000000)) return Promise.reject(new Error('El archivo está dañado: cabecera inválida'));
+    var sal, iv, datos;
+    try { sal = deBase64(p.sal); iv = deBase64(p.iv); datos = deBase64(p.datos); }
+    catch (e) { return Promise.reject(new Error('El archivo está dañado o incompleto')); }
+    var params = { name: 'AES-GCM', iv: iv };
+    if (v2) params.additionalData = utf8(cabecera(p));
+    return derivarClave(clave, sal, iter).then(function (k) { return subtle.decrypt(params, k, datos); })
+      .then(function (plano) {
+        var registros = JSON.parse(new TextDecoder().decode(plano));
+        if (!Array.isArray(registros)) throw new Error('El paquete no tiene una lista de relevamientos');
+        if (typeof p.cantidad === 'number' && registros.length !== p.cantidad) {
+          throw new Error('El paquete está incompleto: dice ' + p.cantidad + ' relevamientos y trae ' + registros.length);
+        }
+        return { meta: p, registros: registros };
+      }, function () { throw new Error('No se pudo abrir: la clave del equipo no coincide, o el archivo fue modificado o está dañado'); });
+  }
+
+  /* Huella del archivo: los primeros 32 bits del SHA-256, en dos grupos (p. ej. 3F9A-21C7). Sirve para
+     confirmar por mensaje que el archivo que llegó es el mismo que salió. La protección contra cambios la da
+     AES-GCM; la huella es solo para comparar a simple vista. */
+  function huella(texto) {
+    return subtle.digest('SHA-256', utf8(texto)).then(function (h) {
+      var b = new Uint8Array(h), s = '';
+      for (var i = 0; i < 4; i++) s += ('0' + b[i].toString(16)).slice(-2);
+      s = s.toUpperCase();
+      return s.slice(0, 4) + '-' + s.slice(4);
+    });
+  }
+
+  /* Un relevamiento importado tiene que tener un id simple y una fecha AAAA-MM-DD: así ningún archivo puede
+     meter código en las pantallas ni romper las rutas de la app. */
+  var ID_VALIDO = /^[A-Za-z0-9_-]{1,80}$/, FECHA_VALIDA = /^\d{4}-\d{2}-\d{2}$/;
+  function registroValido(r) {
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return false;
+    if (typeof r.id !== 'string' || !ID_VALIDO.test(r.id)) return false;
+    if (r.fecha != null && r.fecha !== '' && !FECHA_VALIDA.test(String(r.fecha))) return false;
+    if (r.socio != null && (typeof r.socio !== 'object' || Array.isArray(r.socio))) return false;
+    if (r.bio != null && (typeof r.bio !== 'object' || Array.isArray(r.bio))) return false;
+    if (r.contacto != null && (typeof r.contacto !== 'object' || Array.isArray(r.contacto))) return false;
+    return true;
   }
 
   /* Une registros importados con los locales: gana la versión modificada más recientemente. */
   function unir(locales, entrantes) {
     var porId = {};
     locales.forEach(function (r) { porId[r.id] = r; });
-    var nuevos = 0, actualizados = 0, iguales = 0, aGuardar = [];
+    var nuevos = 0, actualizados = 0, iguales = 0, descartados = 0, aGuardar = [];
     entrantes.forEach(function (r) {
-      if (!r || !r.id) return;
+      if (!registroValido(r)) { descartados++; return; }
       var actual = porId[r.id];
       var copia = Object.assign({}, r, { sincronizado: null, importado: new Date().toISOString() });
       if (!actual) { nuevos++; aGuardar.push(copia); porId[r.id] = copia; }
-      else if ((r.modificado || '') > (actual.modificado || '')) { actualizados++; aGuardar.push(copia); porId[r.id] = copia; }
+      else if (String(r.modificado || '') > String(actual.modificado || '')) { actualizados++; aGuardar.push(copia); porId[r.id] = copia; }
       else iguales++;
     });
-    return { nuevos: nuevos, actualizados: actualizados, iguales: iguales, aGuardar: aGuardar };
+    return { nuevos: nuevos, actualizados: actualizados, iguales: iguales, descartados: descartados, aGuardar: aGuardar };
   }
 
   /* ---------- Archivos ---------- */
@@ -140,7 +193,8 @@
   }
 
   var api = { probarConexion: probarConexion, enviar: enviar, armarPaquete: armarPaquete, abrirPaquete: abrirPaquete,
-    unir: unir, descargar: descargar, compartirODescargar: compartirODescargar };
+    huella: huella, registroValido: registroValido, unir: unir, descargar: descargar, compartirODescargar: compartirODescargar,
+    ITERACIONES: ITERACIONES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.Sync = api;
 })(typeof window !== 'undefined' ? window : this);

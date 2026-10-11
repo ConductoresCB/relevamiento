@@ -16,7 +16,7 @@
   /* ---------------------------------------------------------------- Diccionario */
 
   var NUMERICAS = ['edad', 'orden', 'p10_anios_chofer', 'p16_horas_sin_parar', 'p19_horas_sueno', 'b_peso_kg', 'b_altura_m',
-    'b_imc', 'b_perimetro_cm', 'b_pas_mmhg', 'g_resultado_mgdl', 'g_ayuno_min', 'fr_puntos', 'fh_puntos', 'socio_respondidas', 'visitas'];
+    'b_imc', 'b_perimetro_cm', 'b_pas_mmhg', 'b_pad_mmhg', 'g_resultado_mgdl', 'g_ayuno_min', 'fr_puntos', 'fh_puntos', 'socio_respondidas', 'visitas'];
 
   // Variables cuyas opciones tienen un orden (se dibujan con una escala de un solo color)
   var ORDINALES = ['p02_educacion', 'p04_convive', 'p05_a_cargo', 'p09_rutas_jujuy', 'p12_frec_corredor', 'p12_frec_jujuy',
@@ -69,7 +69,7 @@
     p35_energeticas: 'Bebidas energéticas', p36_coquea: 'Coqueo', p37_alcohol: 'Alcohol fuera del horario laboral',
     p38_comunicacion: 'Comunicación con colegas', p39_comparte_trayectos: 'Comparte trayectos',
     b_dbt_dx: 'Diagnóstico de diabetes', b_sexo: 'Sexo', b_peso_kg: 'Peso', b_altura_m: 'Altura', b_imc: 'IMC', b_perimetro_cm: 'Perímetro abdominal',
-    b_pas_mmhg: 'Presión sistólica', b_act_fisica: 'Actividad física 30 min por día', b_fyv_diario: 'Frutas o verduras todos los días',
+    b_pas_mmhg: 'Presión sistólica', b_pad_mmhg: 'Presión diastólica', b_act_fisica: 'Actividad física 30 min por día', b_fyv_diario: 'Frutas o verduras todos los días',
     b_hta_dx: 'Diagnóstico de hipertensión', b_med_antihta: 'Medicación antihipertensiva', b_glucosa_previa: 'Glucosa elevada alguna vez',
     b_antec_fam_dbt: 'Antecedentes familiares de diabetes', b_fuma: 'Fuma tabaco', g_resultado_mgdl: 'Glucemia periférica', g_ayuno_min: 'Minutos de ayuno',
     fr_puntos: 'Puntaje FINDRISK', fr_categoria: 'Riesgo FINDRISK', fh_puntos: 'Puntaje Framingham', fh_categoria: 'Riesgo Framingham',
@@ -329,6 +329,20 @@
     return { filas: orden.map(function (k) { return recalcular(porId[k]); }), duplicados: duplicados };
   }
 
+  /* Control de calidad (1.4): el mismo código en relevamientos distintos (otro id) puede ser una persona
+     entrevistada dos veces o un error de carga. Devuelve [{codigo, n}] para revisar a mano. */
+  function codigosRepetidos(filas) {
+    var ids = {};
+    filas.forEach(function (r) {
+      var c = r.codigo ? String(r.codigo).trim() : '';
+      if (!c) return;
+      (ids[c] = ids[c] || {})[r.id] = true;
+    });
+    return Object.keys(ids).map(function (c) { return { codigo: c, n: Object.keys(ids[c]).length }; })
+      .filter(function (x) { return x.n > 1; })
+      .sort(function (a, b) { return a.codigo < b.codigo ? -1 : 1; });
+  }
+
   var POR_VISITA = ['id', 'codigo', 'orden', 'hora_inicio', 'hora_fin', 'modificado', 'estado', '_fuente', 'fecha', 'origen', 'encuestador'];
 
   /* Une las visitas de cada participante: para cada dato, el más reciente que no esté vacío. */
@@ -510,7 +524,7 @@
   var api = {
     diccionario: diccionario, variable: variable, SECCIONES_ORDEN: SECCIONES_ORDEN, SIN_DATO: SIN_DATO,
     leerXlsx: leerXlsx, leerCsv: leerCsv, normalizarFila: normalizarFila, esDelRelevamiento: esDelRelevamiento, fechaIso: fechaIso,
-    recalcular: recalcular, unir: unir, consolidar: consolidar, valores: valores, tieneDato: tieneDato,
+    recalcular: recalcular, unir: unir, consolidar: consolidar, codigosRepetidos: codigosRepetidos, valores: valores, tieneDato: tieneDato,
     filtrar: filtrar, frecuencias: frecuencias, numeros: numeros, gruposDe: gruposDe, cruce: cruce, aCsv: aCsv
   };
   if (enNode) module.exports = api;
