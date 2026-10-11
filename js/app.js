@@ -14,10 +14,9 @@
   var CFG = window.CONFIG || {};
   var T = Object.assign({
     jornada: 'Jornada del', conSenal: 'Con señal', sinSenal: 'Sin señal', relevadosHoy: 'Relevados hoy',
-    sinSincronizar: 'Sin sincronizar', nuevoRelevamiento: 'Nuevo relevamiento', buscar: 'Buscar por código, ID o celular',
+    sinSincronizar: 'Sin sincronizar', nuevoRelevamiento: 'Nuevo relevamiento', buscar: 'Buscar por código o celular',
     relevamientosHoy: 'Relevamientos de hoy', cerrarJornada: 'Cerrar jornada y sincronizar', nuevoParticipante: 'Nuevo participante',
-    identificacion: 'Identificación', codigoIdentificacion: 'Código de identificación',
-    participoAntes: '¿Participó en un relevamiento anterior?', datosContacto: 'Datos de contacto',
+    identificacion: 'Identificación', codigoIdentificacion: 'Código de identificación', datosContacto: 'Datos de contacto',
     consentimiento: 'Leyó y aceptó el consentimiento informado.', comparteApp: 'Acepta que sus resultados se vean en la app de camioneros.',
     continuarSocio: 'Continuar con sociodemográfica', irDirectoBio: 'Ir directo a la biológica', cejaSocio: 'Paso 2 · Sociodemográfica',
     irABio: 'Ir a biológica', cejaBio: 'Paso 3 · Biológica', verResultados: 'Ver resultados', cejaResultados: 'Paso 4 · Cierre',
@@ -27,24 +26,22 @@
     responsable: 'la administradora', seccionAdministracion: 'Administración y respaldo', cejaImportar: 'Administración',
     encuestadoresEntrevista: 'Encuestador/es de esta entrevista',
     ayudaEncuestadores: 'Si son varios, escribí los nombres separados por «y».',
-    buscarParticipante: 'Buscar al participante',
-    ayudaBuscarParticipante: 'Alcanza con una parte: los últimos números del código (por ejemplo 44-4600), el número del ID (por ejemplo 3 o A1-0003) o los últimos 4 números del celular.',
-    idParaEntregar: 'Anotáselo o pedile que le saque una foto: con este ID se lo encuentra rápido en la próxima visita.'
+    avisoSinCifrar: 'Estos archivos NO están cifrados: guardalos solo en la computadora de análisis. No los mandes por WhatsApp ni los subas a una carpeta compartida.'
   }, CFG.textos || {});
   function mayuscula(t) { t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
   var PROYECTO = Object.assign({ nombre: 'Relevamiento', lugar: 'Corredor Bioceánico · Jujuy' }, CFG.proyecto || {});
   var PASOS = CFG.pasos || ['Identificación', 'Socio', 'Biológica', 'Resultados'];
-  var RANGOS = Object.assign({ edad: [18, 99], peso: [35, 250], altura: [1.2, 2.2], perimetro: [50, 200], pas: [70, 260], glucemia: [20, 600] }, CFG.rangos || {});
+  var RANGOS = Object.assign({ edad: [18, 99], peso: [35, 250], altura: [1.2, 2.2], perimetro: [50, 200], pas: [70, 260], pad: [40, 150], glucemia: [20, 600] }, CFG.rangos || {});
   var RECOMENDACION = Object.assign({ Bajo: 'Mantener hábitos saludables.', Moderado: 'Evaluar si necesita tratamiento preventivo.',
     Alto: 'Se recomiendan intervenciones médicas.' }, CFG.recomendacionFramingham || {});
   var VERSION_APP = CFG.versionApp || '1.1.0';
 
   var AJUSTES_BASE = Object.assign({ equipo: 'A', dispositivo: '1', ordenDesde: 1, ordenHasta: 199 }, CFG.ajustesIniciales || {},
-    { encuestador: '', puesto: '', url: '', clave: '', contador: 0, ultimaSync: '', ultimoPaquete: '' });
+    { encuestador: '', puesto: '', url: '', clave: '', ultimaSync: '', ultimoPaquete: '', ultimaHuella: '' });
 
   var estado = { ajustes: null, registros: [], actual: null, ruta: { vista: 'jornada' }, buscar: '', verTodos: false,
     instalar: null, sincronizando: false, mensajeSync: '', mensajeConexion: '', importacion: [],
-    online: navigator.onLine, persistente: null, buscarPart: '' };
+    online: navigator.onLine, persistente: null, bitacora: [] };
 
   /* Definiciones indexadas por id (para detalles y opciones exclusivas) */
   var DEF = {};
@@ -67,7 +64,7 @@
   function hoy() { var d = new Date(); return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
   function horaAhora() { var d = new Date(); return dos(d.getHours()) + ':' + dos(d.getMinutes()); }
   function ahoraISO() { return new Date().toISOString(); }
-  function fechaCorta(iso) { if (!iso) return '—'; var p = iso.slice(0, 10).split('-'); return p[2] + '/' + p[1]; }
+  function fechaCorta(iso) { if (!iso) return '—'; var p = String(iso).slice(0, 10).split('-'); return esc(p[2] + '/' + p[1]); }
   function horaDe(iso) { if (!iso) return ''; var d = new Date(iso); return dos(d.getHours()) + ':' + dos(d.getMinutes()); }
   function uuid() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -125,6 +122,17 @@
     });
   }
 
+  /* ---------- registro de operaciones ----------
+     Guarda en el dispositivo qué se hizo y cuándo (iniciar, finalizar, enviar, paquetes, importar, borrar),
+     sin respuestas, contactos ni claves: solo el ID interno, cantidades, nombres de archivo y huellas. */
+  var MAX_BITACORA = 300;
+  function anotar(evento, detalle) {
+    estado.bitacora.push({ t: ahoraISO(), ev: evento, det: detalle || '' });
+    if (estado.bitacora.length > MAX_BITACORA) estado.bitacora = estado.bitacora.slice(-MAX_BITACORA);
+    return DB.guardarAjuste('bitacora', estado.bitacora).catch(function () {});
+  }
+  function pendientes() { return estado.registros.filter(function (r) { return r.consentimiento && R.pendiente(r); }); }
+
   function asignar(ruta, valor) {
     var partes = ruta.split('.'), grupo = partes[0], clave = partes[1], obj;
     if (grupo === 'aj') { estado.ajustes[clave] = valor; guardarAjustes(); return; }
@@ -138,6 +146,8 @@
     else obj[clave] = valor;
     if (grupo === 'reg' && (clave === 'orden' || clave === 'edad' || clave === 'cp')) {
       reg.codigo = R.codigo(reg.orden, reg.edad, reg.cp);
+      // El ID interno sale del N° de orden: si se corrige el orden, se corrige el ID.
+      if (clave === 'orden' && reg.pid_origen === 'orden') reg.participante_id = R.idParticipante(reg.equipo, reg.dispositivo, reg.orden);
     }
     tocar();
   }
@@ -260,8 +270,8 @@
     var id = ruta.replace('.', '-');
     extra = extra || {};
     var control = extra.area
-      ? '<textarea class="entrada" id="' + id + '" data-campo="' + ruta + '" rows="3">' + esc(val) + '</textarea>'
-      : '<input class="entrada' + (extra.mono ? ' mono' : '') + '" id="' + id + '" type="' + (extra.tipo || 'text') + '" data-campo="' + ruta + '" value="' + esc(val) + '"' +
+      ? '<textarea class="entrada" id="' + id + '" data-campo="' + ruta + '" rows="3" spellcheck="false">' + esc(val) + '</textarea>'
+      : '<input class="entrada' + (extra.mono ? ' mono' : '') + '" id="' + id + '" type="' + (extra.tipo || 'text') + '" data-campo="' + ruta + '" value="' + esc(val) + '" spellcheck="false"' +
         (extra.placeholder ? ' placeholder="' + esc(extra.placeholder) + '"' : '') + (extra.autocomplete ? ' autocomplete="' + extra.autocomplete + '"' : ' autocomplete="off"') +
         (extra.inputmode ? ' inputmode="' + extra.inputmode + '"' : '') + (extra.refrescar ? ' data-refrescar="1"' : '') + '>';
     return '<div class="campo"><label for="' + id + '"' + (extra.ocultarRotulo ? ' class="oculto-visual"' : '') + '>' + esc(etiqueta) + '</label>' + control +
@@ -307,8 +317,8 @@
   function vJornada() {
     var aj = estado.ajustes, f = hoy();
     var deHoy = estado.registros.filter(function (r) { return r.fecha === f; });
-    var pend = estado.registros.filter(function (r) { return r.consentimiento && R.pendiente(r); });
-    var falta = !aj.encuestador || !aj.url;
+    var pend = pendientes();
+    var falta = !aj.encuestador || !aj.url || !aj.clave;
     var html = '<main class="pantalla">' +
       '<div class="cabecera"><div style="display:flex;flex-direction:column;gap:2px"><span class="ceja">' + esc(PROYECTO.lugar) + '</span>' +
       '<h1 class="titulo grande">' + esc(T.jornada) + ' ' + fechaCorta(f) + '</h1></div>' +
@@ -319,7 +329,7 @@
       ' · códigos ' + R.pad(aj.ordenDesde, 3) + '–' + R.pad(aj.ordenHasta, 3) + (aj.puesto ? ' · ' + esc(aj.puesto) : '') + (aj.encuestador ? ' · ' + esc(aj.encuestador) : '') + '</span></div>';
 
     if (falta) {
-      html += '<div class="tarjeta aviso"><p><b>Falta configurar este dispositivo.</b> Cargá encuestador/a, equipo y la dirección de la planilla para poder sincronizar.</p>' +
+      html += '<div class="tarjeta aviso"><p><b>Falta configurar este dispositivo.</b> Cargá encuestador/a, equipo, la dirección de la planilla y la clave del equipo para poder enviar y generar paquetes.</p>' +
         '<a class="btn chico" href="#/ajustes">Ir a Ajustes</a></div>';
     }
     if (estado.instalar) {
@@ -334,7 +344,7 @@
       '<button type="button" class="btn primario" data-accion="nuevo">' + ico('mas', 22) + esc(T.nuevoRelevamiento) + '</button>' +
       '<div class="campo"><label for="buscar" class="oculto-visual">Buscar participante ya relevado</label>' +
       '<div class="con-unidad" style="border-color:var(--tinta)">' + ico('buscar', 20) +
-      '<input id="buscar" type="search" data-buscar="1" placeholder="' + esc(T.buscar) + '" value="' + esc(estado.buscar) + '" style="font-family:var(--f-texto);font-size:16px"></div></div>' +
+      '<input id="buscar" type="search" data-buscar="1" spellcheck="false" autocomplete="off" placeholder="' + esc(T.buscar) + '" value="' + esc(estado.buscar) + '" style="font-family:var(--f-texto);font-size:16px"></div></div>' +
       region('lista', listaRegistros()) +
       '<a class="btn azul-claro empujar-abajo" href="#/cierre">' + ico('nube', 22) + esc(T.cerrarJornada) + '</a></main>';
     return html;
@@ -345,7 +355,7 @@
     var f = hoy(), q = estado.buscar.trim();
     var lista = estado.registros.slice();
     if (q) {
-      lista = lista.filter(function (r) { return coincideParticipante(r, q); });
+      lista = lista.filter(function (r) { return coincideRegistro(r, q); });
     } else if (!estado.verTodos) {
       lista = lista.filter(function (r) { return r.fecha === f; });
     }
@@ -355,9 +365,9 @@
       (q ? '' : '<button type="button" class="btn chico" data-accion="ver-todos" style="border:0;background:none;color:var(--azul);padding:0 4px">' + (estado.verTodos ? 'Solo hoy' : 'Ver todos (' + estado.registros.length + ')') + '</button>') + '</div>';
     if (!lista.length) return html + '<div class="vacio">' + (q ? 'No hay coincidencias en este dispositivo.' : 'Todavía no hay relevamientos. Tocá «Nuevo relevamiento» para empezar.') + '</div>';
     return html + '<div class="lista">' + lista.slice(0, 60).map(function (r) {
-      return '<a class="registro" href="#/participante/' + r.id + '" style="text-decoration:none;color:inherit">' +
+      return '<a class="registro" href="#/participante/' + esc(r.id) + '" style="text-decoration:none;color:inherit">' +
         '<span class="arriba"><span class="cod">' + esc(r.codigo || 'Sin código') + '</span><span class="hora">' +
-        (r.fecha === f ? esc(r.hora_inicio || '') : fechaCorta(r.fecha)) + (r.participante_id ? ' · ' + esc(r.participante_id) : '') + '</span></span>' +
+        (r.fecha === f ? esc(r.hora_inicio || '') : fechaCorta(r.fecha)) + '</span></span>' +
         '<span class="abajo">' + pildoras(r) + estadoRegistro(r) + '</span></a>';
     }).join('') + '</div>';
   }
@@ -371,10 +381,20 @@
     return usados.length ? Math.min(h, Math.max.apply(null, usados) + 1) : d;
   }
 
+  /* El N° de orden no se repite en un mismo dispositivo: de él salen el código y el ID interno. */
+  function ordenRepetido(r) {
+    var o = num(r.orden);
+    if (o === null) return null;
+    return estado.registros.find(function (x) {
+      return x.id !== r.id && x.equipo === r.equipo && String(x.dispositivo) === String(r.dispositivo) && num(x.orden) === o;
+    }) || null;
+  }
+
   function erroresIdentificacion(r) {
     var e = [];
-    var o = num(r.orden), ed = num(r.edad);
+    var o = num(r.orden), ed = num(r.edad), rep = ordenRepetido(r);
     if (o === null || o < 1 || o > 999 || o % 1) e.push('El número de orden debe ser de 1 a 999.');
+    if (rep) e.push('El N° de orden ' + o + ' ya se usó en este dispositivo (código ' + (rep.codigo || 'sin completar') + ').');
     if (ed === null || ed < RANGOS.edad[0] || ed > RANGOS.edad[1] || ed % 1) e.push('La edad debe ser un número entero entre ' + RANGOS.edad[0] + ' y ' + RANGOS.edad[1] + '.');
     if (!/^\d{4}$/.test(String(r.cp || ''))) e.push('El código postal debe tener 4 dígitos.');
     if (r.codigo && estado.registros.some(function (x) { return x.id !== r.id && x.codigo === r.codigo; })) e.push('Ese código ya existe en este dispositivo.');
@@ -384,46 +404,22 @@
 
   REGIONES.codigo = function () {
     var r = estado.actual; if (!r) return '';
-    var dup = r.codigo && estado.registros.some(function (x) { return x.id !== r.id && x.codigo === r.codigo; });
+    var rep = ordenRepetido(r);
     return '<div class="placa"><span class="valor">' + esc(r.codigo || '___-__-____') + '</span><span class="partes">orden · edad · código postal</span></div>' +
-      (dup ? '<span class="error-linea">' + ico('alerta', 18) + 'Ese código ya existe en este dispositivo</span>'
+      (rep ? '<span class="error-linea">' + ico('alerta', 18) + 'Ese N° de orden ya se usó en este dispositivo (código ' + esc(rep.codigo || 'sin completar') + ')</span>'
         : r.codigo ? '<span class="ok-linea">' + ico('check', 18) + 'Código libre en este dispositivo</span>' : '<span class="ayuda">Completá orden, edad y código postal.</span>');
   };
 
-  /* Búsqueda tolerante: partes del código (con o sin guiones), número del ID o últimos dígitos del celular. */
-  function coincideParticipante(x, q) {
-    var qn = q.toLowerCase().replace(/[^a-z0-9]/g, ''), qd = q.replace(/\D/g, '');
-    if (!qn) return false;
-    var id = (x.participante_id || '').toLowerCase(), idn = id.replace(/[^a-z0-9]/g, '');
-    var numId = id ? id.split('-').pop().replace(/^0+/, '') : '';
+  /* Búsqueda en este dispositivo: partes del código (con o sin guiones) o últimos números del celular. */
+  function coincideRegistro(x, q) {
+    var qd = q.replace(/\D/g, '');
+    if (qd.length < 2) return false;
     var codDig = (x.codigo || '').replace(/\D/g, '');
     var cel = ((x.contacto && x.contacto.celular) || '').replace(/\D/g, '');
-    if (/[a-z]/.test(qn)) {                                              // con letra: A1-0003, a10003, A1-3, a1 3
-      var partes = q.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-      if (partes.length === 2 && id.split('-')[0] === partes[0] && partes[1].replace(/^0+/, '') === numId) return true;
-      return idn.indexOf(qn) >= 0;
-    }
-    if (numId && qd.replace(/^0+/, '') === numId) return true;           // solo el número del ID: 3 o 0003
-    if (qd.length >= 2 && codDig.indexOf(qd) >= 0) return true;          // partes del código: 4600, 44-4600
+    if (codDig.indexOf(qd) >= 0) return true;                            // partes del código: 4600, 44-4600, 811
     if (qd.length >= 4 && cel.slice(-qd.length) === qd) return true;     // últimos números del celular
     return false;
   }
-
-  REGIONES.buscarPart = function () {
-    var r = estado.actual, q = estado.buscarPart.trim();
-    if (!q) return '';
-    var vistos = {}, res = [];
-    estado.registros.slice().sort(function (a, b) { return (b.creado || '').localeCompare(a.creado || ''); }).forEach(function (x) {
-      if (x.id === r.id || !x.participante_id || vistos[x.participante_id]) return;
-      if (coincideParticipante(x, q)) { vistos[x.participante_id] = true; res.push(x); }
-    });
-    if (!res.length) return '<span class="ayuda">No aparece en este celular. Si tiene su ID de una visita anterior (por ejemplo en una foto), escribilo abajo.</span>';
-    return '<div class="lista">' + res.slice(0, 8).map(function (x) {
-      return '<button type="button" class="registro" data-accion="vincular" data-valor="' + esc(x.id) + '"><span class="arriba"><span class="cod">' + esc(x.participante_id) +
-        '</span><span class="hora">' + fechaCorta(x.fecha) + '</span></span><span class="ayuda">Código ' + esc(x.codigo) + ' · ' + esc(x.edad || '') + ' años' +
-        (x.encuestador ? ' · ' + esc(x.encuestador) : '') + (x.puesto ? ' · ' + esc(x.puesto) : '') + '</span><span class="ayuda" style="font-weight:700;color:var(--azul)">Tocá para vincular</span></button>';
-    }).join('') + '</div>';
-  };
 
   function vParticipante() {
     var r = estado.actual, aj = estado.ajustes;
@@ -440,17 +436,6 @@
 
     html += campoTexto('reg.encuestador', T.encuestadoresEntrevista, r.encuestador, { ayuda: T.ayudaEncuestadores, placeholder: 'Nombre y apellido' });
 
-    html += '<fieldset class="pregunta"><legend>' + esc(T.participoAntes) + '</legend>' +
-      grupoOpciones('reg.previo', ['Sí', 'No'], r.previo, false, 'grilla') + '</fieldset>';
-    if (r.previo === 'Sí') {
-      html += '<div class="campo"><label for="buscar-part">' + esc(T.buscarParticipante) + '</label>' +
-        '<input class="entrada" id="buscar-part" type="search" data-buscar-part="1" value="' + esc(estado.buscarPart) + '" autocomplete="off" aria-describedby="buscar-part-ayuda">' +
-        '<span class="ayuda" id="buscar-part-ayuda">' + esc(T.ayudaBuscarParticipante) + '</span></div>' +
-        region('buscarPart', REGIONES.buscarPart()) +
-        campoTexto('reg.participante_id', 'ID de participante', r.participante_id, { mono: true, placeholder: 'p. ej. A1-0007' });
-    } else {
-      html += '<div class="ayuda">ID de participante: <b>' + esc(r.participante_id || 'se asigna al continuar') + '</b></div>';
-    }
 
     html += '<section style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
       '<h2 class="seccion">' + esc(T.datosContacto) + '</h2><span class="ayuda">Se guardan aparte de las respuestas</span></div>' +
@@ -546,14 +531,18 @@
     filas += '<div class="calc-fila"><span>Perímetro <b>' + esc(b.b_perimetro_cm || '—') + '</b>' + rango + '</span><span class="pts">FR ' + pts(fr, 'perimetro') + '</span></div>';
     var trat = b.b_med_antihta === 'Sí' ? ', con tratamiento' : b.b_med_antihta === 'No' ? ', sin tratamiento' : '';
     filas += '<div class="calc-fila"><span>PAS <b>' + esc(b.b_pas_mmhg || '—') + '</b>' + trat + '</span><span class="pts">FH ' + pts(fh, 'pas') + '</span></div>';
+    var pas = num(b.b_pas_mmhg), pad = num(b.b_pad_mmhg);
+    filas += '<div class="calc-fila"><span>PAD <b>' + esc(b.b_pad_mmhg || '—') + '</b></span><span class="pts">no puntúa</span></div>';
+    var avisoPA = pas !== null && pad !== null && pad >= pas
+      ? '<span class="error-linea">' + ico('alerta', 18) + 'Revisá la presión: la diastólica es igual o mayor que la sistólica.</span>' : '';
     if (estado.ruta.n === 2) {
       filas += '<div class="calc-fila"><span>Tabaco y diabetes</span><span class="pts">FH ' + pts(fh, 'tabaco') + ' · ' + pts(fh, 'diabetes') + '</span></div>';
     }
     var notas = [];
     if (fr.aplica === false) notas.push('FINDRISK no corresponde: ' + fr.motivo.toLowerCase() + '.');
     if (fh.aplica === false) notas.push('Framingham no corresponde: ' + fh.motivo.toLowerCase() + '.');
-    return '<div class="calc"><span class="titulo-calc">' + ico('igual', 18) + 'Calculado automáticamente</span>' + filas +
-      '<span class="nota">FR: FINDRISK · FH: Framingham con IMC' + (notas.length ? '. ' + esc(notas.join(' ')) : '') + '</span></div>';
+    return avisoPA + '<div class="calc"><span class="titulo-calc">' + ico('igual', 18) + 'Calculado automáticamente</span>' + filas +
+      '<span class="nota">FR: FINDRISK · FH: Framingham con IMC (usa la sistólica; la diastólica se registra y no entra en el cálculo)' + (notas.length ? '. ' + esc(notas.join(' ')) : '') + '</span></div>';
   };
 
   REGIONES.pieBio = function () {
@@ -589,8 +578,11 @@
         '<div class="grilla-campos">' +
         campoNumero('bio.b_peso_kg', 'Peso', b.b_peso_kg, { unidad: 'kg', min: RANGOS.peso[0], max: RANGOS.peso[1], ayuda: 'Con un decimal' }) +
         campoNumero('bio.b_altura_m', 'Altura', b.b_altura_m, { unidad: 'm', min: RANGOS.altura[0], max: RANGOS.altura[1], ayuda: 'Válido ' + fmt(RANGOS.altura[0], 2) + '–' + fmt(RANGOS.altura[1], 2) }) +
+        '</div>' +
         campoNumero('bio.b_perimetro_cm', 'Perímetro abdominal', b.b_perimetro_cm, { unidad: 'cm', min: RANGOS.perimetro[0], max: RANGOS.perimetro[1], ayuda: 'Sin decimales' }) +
-        campoNumero('bio.b_pas_mmhg', 'Presión sistólica', b.b_pas_mmhg, { unidad: 'mmHg', min: RANGOS.pas[0], max: RANGOS.pas[1], ayuda: 'Tres cifras' }) +
+        '<div class="grilla-campos">' +
+        campoNumero('bio.b_pas_mmhg', 'Presión sistólica', b.b_pas_mmhg, { unidad: 'mmHg', min: RANGOS.pas[0], max: RANGOS.pas[1], ayuda: 'La «alta». Tres cifras' }) +
+        campoNumero('bio.b_pad_mmhg', 'Presión diastólica', b.b_pad_mmhg, { unidad: 'mmHg', min: RANGOS.pad[0], max: RANGOS.pad[1], ayuda: 'La «baja». Dos o tres cifras' }) +
         '</div>' + region('calcBio', REGIONES.calcBio());
     } else if (n === 2) {
       html += preguntaBio('b_act_fisica', 'grilla') + preguntaBio('b_fyv_diario', 'grilla') + preguntaBio('b_hta_dx', 'grilla') +
@@ -629,11 +621,6 @@
   function vResultados() {
     var r = estado.actual, b = r.bio || {}, c = R.calcular(r), fr = c.findrisk, fh = c.framingham;
     var html = '<main class="pantalla">' + barra('#/bio/' + r.id + '/3', T.cejaResultados, T.resultados, placaChica(r)) + pasosRelevamiento(r, 3);
-    if (r.participante_id) {
-      html += '<section class="tarjeta" style="border:2px solid var(--tinta);align-items:center;text-align:center">' +
-        '<h2 class="seccion">ID del participante</h2><span style="font-family:var(--f-mono);font-size:40px;font-weight:500;letter-spacing:.04em">' + esc(r.participante_id) + '</span>' +
-        '<span class="ayuda">' + esc(T.idParaEntregar) + '</span></section>';
-    }
 
     html += '<section class="tarjeta"><h2 class="seccion">FINDRISK · riesgo de diabetes a 10 años</h2>';
     if (fr.aplica === false) html += '<p>No corresponde: ' + esc(fr.motivo) + '.</p>';
@@ -689,7 +676,7 @@
     var deHoy = estado.registros.filter(function (r) { return r.fecha === f; });
     var fin = deHoy.filter(function (r) { return r.estado === 'finalizado'; });
     var enCurso = deHoy.filter(function (r) { return r.estado !== 'finalizado'; });
-    var pend = estado.registros.filter(function (r) { return r.consentimiento && R.pendiente(r); });
+    var pend = pendientes();
     var codigos = {}, dup = [];
     estado.registros.forEach(function (r) { if (!r.codigo) return; if (codigos[r.codigo]) dup.push(r.codigo); codigos[r.codigo] = true; });
     var sinConsent = estado.registros.filter(function (r) { return !r.consentimiento && r.modificado; }).length;
@@ -707,7 +694,7 @@
       enCurso.map(function (r) {
         return '<div style="display:flex;align-items:center;gap:8px;font-size:15px"><span style="color:var(--error);display:inline-flex">' + ico('alerta', 18) + '</span>' +
           '<span style="flex:1;min-width:0"><span style="font-family:var(--f-mono);font-size:14px">' + esc(r.codigo || 'Sin código') + '</span>: sin finalizar</span>' +
-          '<a class="btn chico peligro" href="#/participante/' + r.id + '">Revisar</a></div>';
+          '<a class="btn chico peligro" href="#/participante/' + esc(r.id) + '">Revisar</a></div>';
       }).join('') + '</section>';
 
     var motivo = !aj.url ? 'Falta la dirección de la planilla en Ajustes.' : !estado.online ? 'El dispositivo no tiene señal en este momento.' : '';
@@ -718,12 +705,15 @@
       (estado.sincronizando ? 'Sincronizando…' : esc(T.sincronizarAhora)) + '</button>' + region('estadoSync', REGIONES.estadoSync()) + '</section>';
 
     html += '<section class="tarjeta discontinua"><h2 class="seccion" style="color:var(--tinta-2)">Sin señal</h2>' +
-      '<p>Generá un archivo ' + (aj.clave ? 'cifrado' : '<b>sin cifrar</b> (falta la clave del equipo)') + ' con lo relevado para mandar por WhatsApp, correo o Drive. ' + esc(mayuscula(T.responsable)) + ' lo importa y se descartan duplicados.</p>' +
-      '<button type="button" class="btn" data-accion="paquete">' + ico('compartir', 22) + esc(T.compartirPaquete) + '</button>' +
-      '<button type="button" class="btn chico" data-accion="csv">' + ico('bajar', 18) + esc(T.descargarCsv) + '</button></section>' +
+      (aj.clave
+        ? '<p>Generá un archivo cifrado con lo relevado para mandar por WhatsApp, correo o Drive. ' + esc(mayuscula(T.responsable)) + ' lo importa y se descartan duplicados. ' +
+          'Mandale también la <b>huella</b> que aparece al generarlo: si a ' + esc(T.responsable) + ' le da la misma, el archivo llegó entero.</p>'
+        : '<p class="error-linea">' + ico('alerta', 18) + 'Falta la clave del equipo en Ajustes: sin clave no se genera el paquete.</p>') +
+      '<button type="button" class="btn" data-accion="paquete"' + (aj.clave ? '' : ' disabled') + '>' + ico('compartir', 22) + esc(T.compartirPaquete) + '</button>' +
+      (aj.ultimaHuella ? '<p class="ayuda" style="margin:0">Último paquete: ' + fechaCorta(aj.ultimoPaquete) + ' ' + horaDe(aj.ultimoPaquete) + ' · huella <b class="mono">' + esc(aj.ultimaHuella) + '</b></p>' : '') +
+      '<p class="ayuda" style="margin:0">El paquete es una copia para transportar: no libera el celular. Lo que no se envió a la planilla queda guardado acá.</p></section>' +
       '<span class="ayuda empujar-abajo" style="text-align:center">' +
-      (aj.ultimaSync ? 'Última sincronización: ' + fechaCorta(aj.ultimaSync) + ' ' + horaDe(aj.ultimaSync) : 'Este dispositivo todavía no sincronizó') +
-      (aj.ultimoPaquete ? ' · último paquete: ' + fechaCorta(aj.ultimoPaquete) + ' ' + horaDe(aj.ultimoPaquete) : '') + '</span></main>';
+      (aj.ultimaSync ? 'Última sincronización: ' + fechaCorta(aj.ultimaSync) + ' ' + horaDe(aj.ultimaSync) : 'Este dispositivo todavía no sincronizó') + '</span></main>';
     return html;
   }
 
@@ -746,14 +736,28 @@
       '<section class="tarjeta"><h2 class="seccion">' + esc(T.seccionAdministracion) + '</h2>' +
       '<a class="btn chico" href="#/importar">' + ico('subir', 18) + 'Importar paquetes de otros dispositivos</a>' +
       '<a class="btn chico" href="tablero/">' + ico('seguir', 18) + 'Abrir el tablero de análisis</a>' +
-      '<button type="button" class="btn chico" data-accion="respaldo">' + ico('bajar', 18) + 'Respaldo completo de este dispositivo</button>' +
-      '<button type="button" class="btn chico" data-accion="contactos">' + ico('bajar', 18) + 'Descargar contactos (CSV)</button>' +
+      '<button type="button" class="btn chico" data-accion="respaldo"' + (aj.clave ? '' : ' disabled') + '>' + ico('bajar', 18) + 'Respaldo cifrado de este dispositivo</button>' +
       (estado.instalar ? '<button type="button" class="btn chico azul-claro" data-accion="instalar">Instalar la app</button>' : '') + '</section>' +
-      '<section class="tarjeta" style="border-color:var(--error)"><h2 class="seccion" style="color:var(--error)">Zona de cuidado</h2>' +
-      '<p>Borra todos los relevamientos de ESTE dispositivo (por ejemplo, después de la prueba). Los que ya se enviaron siguen en la planilla.</p>' +
-      '<button type="button" class="btn chico peligro" data-accion="borrar-todo">Borrar todos los datos de este dispositivo</button></section>' +
+      vZonaCuidado() + vBitacora() +
       '<p class="ayuda">App ' + esc(VERSION_APP) + ' · instrumento ' + esc(I.CUESTIONARIO.version) + ' · ' + estado.registros.length + ' relevamientos guardados · almacenamiento ' +
       (estado.persistente === true ? 'protegido' : estado.persistente === false ? 'no protegido: hacé respaldos frecuentes' : 'sin verificar') + '</p></main>';
+  }
+
+  function vZonaCuidado() {
+    var pend = pendientes().length;
+    return '<section class="tarjeta" style="border-color:var(--error)"><h2 class="seccion" style="color:var(--error)">Zona de cuidado</h2>' +
+      '<p>Borra todos los relevamientos de ESTE celular (por ejemplo, después de la práctica). Los que ya se enviaron siguen en la planilla.' +
+      (pend ? ' <b>Hay ' + pend + ' sin enviar</b>: si los borrás, antes se descarga un respaldo cifrado.' : '') + '</p>' +
+      '<button type="button" class="btn chico peligro" data-accion="borrar-todo"' + (estado.registros.length ? '' : ' disabled') + '>Borrar los datos de este celular</button></section>';
+  }
+
+  function vBitacora() {
+    var ult = estado.bitacora.slice(-40).reverse();
+    return '<details class="tarjeta"><summary class="seccion" style="cursor:pointer">Registro de operaciones de este dispositivo</summary>' +
+      '<p class="ayuda" style="margin:0">Qué se hizo y cuándo. No guarda respuestas, contactos ni claves.</p>' +
+      (ult.length ? '<div class="bitacora">' + ult.map(function (x) {
+        return '<div style="font-size:14px"><span class="mono">' + fechaCorta(x.t) + ' ' + horaDe(x.t) + '</span> · <b>' + esc(x.ev) + '</b>' + (x.det ? ' · ' + esc(x.det) : '') + '</div>';
+      }).join('') + '</div>' : '<p class="ayuda" style="margin:0">Todavía no hay operaciones registradas.</p>') + '</details>';
   }
 
   /* ---------- Importar ---------- */
@@ -761,7 +765,8 @@
     if (!estado.importacion.length) return '';
     return '<div class="tarjeta resultados-importacion">' + estado.importacion.map(function (x) {
       return x.error ? '<span class="error-linea">' + ico('alerta', 16) + esc(x.nombre) + ': ' + esc(x.error) + '</span>'
-        : '<span class="ok-linea" style="color:var(--tinta)">' + ico('check', 16) + esc(x.nombre) + ': ' + x.nuevos + ' nuevos, ' + x.actualizados + ' actualizados, ' + x.iguales + ' ya estaban</span>';
+        : '<span class="ok-linea" style="color:var(--tinta)">' + ico('check', 16) + esc(x.nombre) + ': ' + x.nuevos + ' nuevos, ' + x.actualizados + ' actualizados, ' + x.iguales + ' ya estaban' +
+          (x.descartados ? ', ' + x.descartados + ' descartados por formato inválido' : '') + ' · huella ' + esc(x.huella) + '</span>';
     }).join('') + '</div>';
   };
 
@@ -772,7 +777,9 @@
       '<input type="file" id="archivos-paquete" accept=".txt,.json,text/plain,application/json" multiple class="oculto-visual">' +
       region('importacion', REGIONES.importacion()) +
       '<a class="btn azul" href="#/cierre">' + ico('nube', 22) + 'Enviar todo a la planilla</a>' +
-      '<button type="button" class="btn chico" data-accion="csv">' + ico('bajar', 18) + 'Descargar CSV consolidado</button></main>';
+      '<section class="tarjeta"><h2 class="seccion">Archivos para analizar (sin cifrar)</h2><p class="ayuda" style="margin:0">' + esc(T.avisoSinCifrar) + '</p>' +
+      '<button type="button" class="btn chico" data-accion="csv">' + ico('bajar', 18) + 'Descargar CSV consolidado</button>' +
+      '<button type="button" class="btn chico" data-accion="contactos">' + ico('bajar', 18) + 'Descargar contactos (CSV)</button></section></main>';
   }
 
   /* ---------- acciones ---------- */
@@ -783,7 +790,7 @@
         equipo: aj.equipo, dispositivo: aj.dispositivo, encuestador: aj.encuestador, puesto: aj.puesto, consentimiento: false, comparte_app: false,
         contacto: {}, socio: {}, bio: {}, estado: 'borrador', creado: ahoraISO(), modificado: null, sincronizado: null,
         version_instrumento: I.CUESTIONARIO.version };
-      estado.actual = r; estado.buscarPart = '';
+      estado.actual = r;
       ir('#/participante/' + r.id);
     },
     'ver-todos': function () { estado.verTodos = !estado.verTodos; refrescar(); },
@@ -806,57 +813,46 @@
         var previos = Array.isArray(antes) ? antes : (antes ? [antes] : []);
         previos.forEach(function (op) { if (sel.indexOf(op) < 0 && def.detalles[op]) asignar(grupo + '.' + def.detalles[op].id, ''); });
       }
-      if (ruta === 'reg.previo') {
-        if (nuevo !== 'Sí' && estado.actual.pid_origen === 'vinculado') { asignar('reg.participante_id', ''); asignar('reg.pid_origen', ''); }
-      }
       if (ruta === 'bio.g_acepta' && nuevo === 'Sí' && !valor('bio.g_hora_medicion')) asignar('bio.g_hora_medicion', horaAhora());
       asignar(ruta, nuevo);
-      render();
-    },
-    'vincular': function (b) {
-      var origen = estado.registros.find(function (x) { return x.id === b.dataset.valor; });
-      if (!origen) return;
-      asignar('reg.participante_id', origen.participante_id);
-      asignar('reg.pid_origen', 'vinculado');
-      var k = estado.actual.contacto || {}, ko = origen.contacto || {};
-      if (!k.celular && ko.celular) asignar('contacto.celular', ko.celular);
-      if (!k.correo && ko.correo) asignar('contacto.correo', ko.correo);
-      estado.buscarPart = '';
-      toast('Vinculado a ' + origen.participante_id);
       render();
     },
     'continuar': function (b) {
       var r = estado.actual, errores = erroresIdentificacion(r);
       if (errores.length) { toast(errores[0]); return; }
       if (!r.participante_id) {
-        var aj = estado.ajustes;
-        aj.contador = (Number(aj.contador) || 0) + 1;
-        guardarAjustes();
-        asignar('reg.participante_id', String(aj.equipo).toUpperCase() + aj.dispositivo + '-' + R.pad(aj.contador, 4));
-        asignar('reg.pid_origen', 'nuevo');
+        // ID interno: equipo + dispositivo + N° de orden (p. ej. J1-0811). No se muestra: en pantalla va el código.
+        asignar('reg.participante_id', R.idParticipante(r.equipo, r.dispositivo, r.orden));
+        asignar('reg.pid_origen', 'orden');
+        anotar('Relevamiento iniciado', r.participante_id);
       }
       tocar();
       ir(b.dataset.valor === 'bio' ? '#/bio/' + r.id + '/1' : '#/socio/' + r.id + '/1');
     },
     'eliminar': function () {
       var r = estado.actual;
-      var aviso = r.sincronizado ? ' Ya se envió a la planilla: allí hay que borrarlo a mano.' : '';
+      var aviso = r.sincronizado ? ' Ya se envió a la planilla: allí hay que borrarlo a mano.'
+        : r.consentimiento ? ' ATENCIÓN: no tiene copia en la planilla, se pierde definitivamente.' : '';
       if (!window.confirm('¿Eliminar el relevamiento ' + (r.codigo || '') + '? No se puede deshacer.' + aviso)) return;
       clearTimeout(reloj);
       DB.borrar(r.id).then(function () {
         estado.registros = estado.registros.filter(function (x) { return x.id !== r.id; });
+        anotar('Relevamiento eliminado', (r.participante_id || 'sin ID') + (r.sincronizado ? ' (estaba en la planilla)' : ' (sin copia en la planilla)'));
         estado.actual = null; toast('Relevamiento eliminado'); ir('#/jornada');
       });
     },
     'finalizar': function () {
       var r = estado.actual;
       r.estado = 'finalizado'; r.hora_fin = horaAhora(); tocar();
-      guardarActual().then(function () { toast('Relevamiento ' + (r.codigo || '') + ' guardado'); ir('#/jornada'); });
+      guardarActual().then(function () {
+        anotar('Relevamiento finalizado', r.participante_id || '');
+        toast('Relevamiento ' + (r.codigo || '') + ' guardado'); ir('#/jornada');
+      });
     },
     'sincronizar': function () {
       if (estado.sincronizando) return;
       var aj = estado.ajustes;
-      var pend = estado.registros.filter(function (r) { return r.consentimiento && R.pendiente(r); });
+      var pend = pendientes();
       if (!pend.length) { toast('No hay relevamientos pendientes'); return; }
       var marcas = {};
       pend.forEach(function (r) { marcas[r.id] = r.modificado; });
@@ -868,20 +864,33 @@
             if (ids.indexOf(r.id) >= 0 && r.modificado === marcas[r.id]) { r.sincronizado = ahora; hechos.push(r); }
           });
           aj.ultimaSync = ahora; guardarAjustes();
-          estado.mensajeSync = 'Listo: ' + hechos.length + ' relevamientos guardados en la planilla.';
+          var faltan = pend.length - hechos.length;
+          estado.mensajeSync = 'Listo: ' + hechos.length + ' relevamientos guardados en la planilla.' +
+            (faltan ? ' ' + faltan + ' no se confirmaron: quedan pendientes para el próximo envío.' : '');
+          anotar('Envío a la planilla', hechos.length + ' confirmados de ' + pend.length);
           return DB.guardarVarios(hechos);
         })
-        .catch(function (e) { estado.mensajeSync = 'No se pudo sincronizar (' + e.message + '). Los datos siguen guardados en el dispositivo.'; })
+        .catch(function (e) {
+          estado.mensajeSync = 'No se pudo sincronizar (' + e.message + '). Los datos siguen guardados en el dispositivo.';
+          anotar('Envío fallido', String(e.message || '').slice(0, 80));
+        })
         .then(function () { estado.sincronizando = false; render(); });
     },
     'paquete': function () {
       var aj = estado.ajustes, f = hoy();
+      if (!aj.clave) { toast('Falta la clave del equipo en Ajustes: sin clave no se genera el paquete'); return; }
       var regs = estado.registros.filter(function (r) { return r.consentimiento && (r.fecha === f || R.pendiente(r)); });
       if (!regs.length) { toast('No hay relevamientos para empaquetar'); return; }
       var d = new Date(), nombre = 'paquete_' + aj.equipo + aj.dispositivo + '_' + f + '_' + dos(d.getHours()) + dos(d.getMinutes()) + '.txt';
+      var texto = '', hu = '';
       S.armarPaquete(regs, { equipo: aj.equipo, dispositivo: aj.dispositivo }, aj.clave)
-        .then(function (txt) { return S.compartirODescargar(nombre, txt, 'text/plain', 'Paquete de relevamiento ' + aj.equipo + aj.dispositivo); })
-        .then(function (modo) { aj.ultimoPaquete = ahoraISO(); guardarAjustes(); toast(modo === 'compartido' ? 'Paquete compartido' : 'Paquete descargado: ' + nombre); render(); })
+        .then(function (txt) { texto = txt; return S.huella(txt); })
+        .then(function (h) { hu = h; return S.compartirODescargar(nombre, texto, 'text/plain', 'Paquete ' + aj.equipo + aj.dispositivo + ' · huella ' + h); })
+        .then(function (modo) {
+          aj.ultimoPaquete = ahoraISO(); aj.ultimaHuella = hu; guardarAjustes();
+          anotar('Paquete generado', nombre + ' · ' + regs.length + ' relevamientos · huella ' + hu + ' · ' + modo);
+          toast((modo === 'compartido' ? 'Paquete compartido' : 'Paquete descargado') + ' · huella ' + hu); render();
+        })
         .catch(function (e) { if (e && e.name !== 'AbortError') toast('No se pudo generar el paquete: ' + e.message); });
     },
     'csv': function () {
@@ -890,41 +899,48 @@
       var cols = I.columnas().map(function (c) { return c.id; });
       var filas = regs.map(function (r) { return R.aplanar(r).fila; });
       S.descargar('datos_' + estado.ajustes.equipo + estado.ajustes.dispositivo + '_' + hoy() + '.csv', R.csv(filas, cols), 'text/csv;charset=utf-8');
+      anotar('CSV descargado (sin cifrar)', regs.length + ' relevamientos');
     },
     'contactos': function () {
       var regs = estado.registros.filter(function (r) { return r.consentimiento; });
+      if (!regs.length) { toast('No hay datos para exportar'); return; }
       var filas = regs.map(function (r) { return R.aplanar(r).contacto; });
       S.descargar('contactos_' + estado.ajustes.equipo + estado.ajustes.dispositivo + '_' + hoy() + '.csv', R.csv(filas, I.CONTACTO), 'text/csv;charset=utf-8');
+      anotar('Contactos descargados (sin cifrar)', regs.length + ' filas');
     },
     'respaldo': function () {
-      var aj = estado.ajustes;
-      S.armarPaquete(estado.registros, { equipo: aj.equipo, dispositivo: aj.dispositivo }, aj.clave).then(function (txt) {
-        S.descargar('respaldo_' + aj.equipo + aj.dispositivo + '_' + hoy() + '.txt', txt, 'text/plain');
-      });
+      respaldoCifrado().then(function (h) { if (h) toast('Respaldo descargado · huella ' + h); })
+        .catch(function (e) { toast('No se pudo generar el respaldo: ' + e.message); });
     },
     'probar': function () {
       var aj = estado.ajustes;
       if (!aj.url) { estado.mensajeConexion = 'Primero pegá la dirección de la aplicación web.'; refrescar(); return; }
       estado.mensajeConexion = 'Probando…'; refrescar();
       S.probarConexion(aj.url.trim(), aj.clave).then(function (r) {
-        estado.mensajeConexion = r && r.ok ? 'Conexión correcta con la planilla «' + (r.planilla || '') + '».' : 'La planilla respondió: ' + ((r && r.error) || 'error');
+        estado.mensajeConexion = r && r.ok ? 'Conexión correcta con la planilla «' + (r.planilla || '') + '»' +
+          (r.version ? ' (script ' + r.version + ').' : '. El script es anterior a 1.4: conviene actualizarlo.') : 'La planilla respondió: ' + ((r && r.error) || 'error');
       }).catch(function (e) { estado.mensajeConexion = 'Sin conexión con la planilla (' + e.message + ').'; })
         .then(refrescar);
     },
     'borrar-todo': function () {
-      var aj = estado.ajustes;
-      var pend = estado.registros.filter(function (r) { return r.consentimiento && R.pendiente(r); }).length;
-      var aviso = pend ? 'ATENCIÓN: hay ' + pend + ' relevamientos SIN SINCRONIZAR que se van a perder.\n\n' : '';
-      var escrito = window.prompt(aviso + 'Se van a borrar ' + estado.registros.length + ' relevamientos de este dispositivo. Para confirmar, escribí BORRAR');
+      var aj = estado.ajustes, total = estado.registros.length, pend = pendientes().length;
+      if (!total) { toast('No hay relevamientos en este dispositivo'); return; }
+      var palabra = 'BORRAR';
+      var aviso = pend ? 'ATENCIÓN: ' + pend + ' relevamientos NO se enviaron a la planilla. Si son datos reales, cancelá y sincronizá primero.\n' +
+        'Si seguís, antes se descarga un respaldo cifrado.\n\n' : '';
+      var escrito = window.prompt(aviso + 'Se van a borrar ' + total + ' relevamientos de este dispositivo. Para confirmar, escribí ' + palabra);
       if (escrito === null) return;
-      if (escrito.trim().toUpperCase() !== 'BORRAR') { toast('No se borró nada (no escribiste BORRAR)'); return; }
-      var reiniciar = window.confirm('¿Eran solo datos de PRUEBA?\n\nAceptar: sí, la numeración de IDs de participante vuelve a empezar (A1-0001).\nCancelar: no, se mantiene la numeración para no repetir IDs.');
-      DB.borrarTodos().then(function () {
+      if (escrito.trim().toUpperCase() !== palabra) { toast('No se borró nada (no escribiste ' + palabra + ')'); return; }
+      // Red de seguridad: si hay algo sin copia en la planilla, antes se descarga un respaldo cifrado.
+      (pend && aj.clave ? respaldoCifrado() : Promise.resolve('')).then(function () {
+        return DB.borrarTodos();
+      }).then(function () {
         estado.registros = []; estado.actual = null;
-        if (reiniciar) aj.contador = 0;
-        aj.ultimaSync = ''; aj.ultimoPaquete = '';
+        aj.ultimaSync = ''; aj.ultimoPaquete = ''; aj.ultimaHuella = '';
+        anotar('Borrado total', total + ' relevamientos (' + pend + ' sin copia en la planilla)');
         return guardarAjustes();
-      }).then(function () { toast('Se borraron los datos de este dispositivo'); ir('#/jornada'); });
+      }).then(function () { toast('Se borraron los datos de este dispositivo'); ir('#/jornada'); })
+        .catch(function (e) { toast('No se borró nada: ' + e.message); });
     },
     'instalar': function () {
       if (!estado.instalar) return;
@@ -932,6 +948,21 @@
       estado.instalar.userChoice.then(function () { estado.instalar = null; render(); });
     }
   };
+
+  /* Respaldo cifrado de todo lo que hay en el dispositivo. Devuelve la huella del archivo. */
+  function respaldoCifrado() {
+    var aj = estado.ajustes;
+    if (!aj.clave) return Promise.reject(new Error('falta la clave del equipo en Ajustes'));
+    if (!estado.registros.length) { toast('No hay relevamientos para respaldar'); return Promise.resolve(''); }
+    var d = new Date(), nombre = 'respaldo_' + aj.equipo + aj.dispositivo + '_' + hoy() + '_' + dos(d.getHours()) + dos(d.getMinutes()) + '.txt', texto = '';
+    return S.armarPaquete(estado.registros, { equipo: aj.equipo, dispositivo: aj.dispositivo }, aj.clave)
+      .then(function (txt) { texto = txt; return S.huella(txt); })
+      .then(function (h) {
+        S.descargar(nombre, texto, 'text/plain');
+        anotar('Respaldo cifrado', nombre + ' · ' + estado.registros.length + ' relevamientos · huella ' + h);
+        return h;
+      });
+  }
 
   /* ---------- eventos ---------- */
   raizApp.addEventListener('click', function (e) {
@@ -944,7 +975,6 @@
   raizApp.addEventListener('input', function (e) {
     var el = e.target;
     if (el.dataset.buscar) { estado.buscar = el.value; refrescar(); return; }
-    if (el.dataset.buscarPart) { estado.buscarPart = el.value; refrescar(); return; }
     if (!el.dataset.campo || el.type === 'checkbox' || el.tagName === 'SELECT') return;
     var v = el.value;
     if (el.dataset.campo.indexOf('aj.') === 0 && (el.dataset.campo === 'aj.ordenDesde' || el.dataset.campo === 'aj.ordenHasta')) v = v.replace(/\D/g, '');
@@ -985,7 +1015,10 @@
     estado.importacion = [];
     archivos.reduce(function (cadena, archivo) {
       return cadena.then(function () {
-        return archivo.text().then(function (txt) { return S.abrirPaquete(txt, estado.ajustes.clave); })
+        var hu = '';
+        return archivo.text().then(function (txt) {
+          return S.huella(txt).then(function (h) { hu = h; return S.abrirPaquete(txt, estado.ajustes.clave); });
+        })
           .then(function (paq) {
             var res = S.unir(estado.registros, paq.registros);
             return DB.guardarVarios(res.aGuardar).then(function () {
@@ -993,10 +1026,16 @@
                 var i = estado.registros.findIndex(function (x) { return x.id === r.id; });
                 if (i >= 0) estado.registros[i] = r; else estado.registros.push(r);
               });
-              estado.importacion.push({ nombre: archivo.name, nuevos: res.nuevos, actualizados: res.actualizados, iguales: res.iguales });
+              estado.importacion.push({ nombre: archivo.name, nuevos: res.nuevos, actualizados: res.actualizados, iguales: res.iguales,
+                descartados: res.descartados, huella: hu });
+              anotar('Paquete importado', archivo.name.slice(0, 60) + ' · huella ' + hu + ' · ' + res.nuevos + ' nuevos, ' + res.actualizados +
+                ' actualizados, ' + res.iguales + ' iguales' + (res.descartados ? ', ' + res.descartados + ' descartados' : ''));
             });
           })
-          .catch(function (e) { estado.importacion.push({ nombre: archivo.name, error: e.message }); })
+          .catch(function (e) {
+            estado.importacion.push({ nombre: archivo.name, error: e.message + (hu ? ' (huella ' + hu + ')' : '') });
+            anotar('Paquete rechazado', archivo.name.slice(0, 60) + (hu ? ' · huella ' + hu : '') + ' · ' + String(e.message).slice(0, 80));
+          })
           .then(refrescar);
       });
     }, Promise.resolve());
@@ -1007,6 +1046,9 @@
     if (!window.indexedDB) { raizApp.innerHTML = '<main class="pantalla"><p>Este navegador no permite guardar datos. Usá Chrome actualizado.</p></main>'; return; }
     DB.leerAjuste('ajustes').then(function (aj) {
       estado.ajustes = Object.assign({}, AJUSTES_BASE, aj || {});
+      return DB.leerAjuste('bitacora');
+    }).then(function (b) {
+      estado.bitacora = Array.isArray(b) ? b : [];
       return DB.todos();
     }).then(function (regs) {
       estado.registros = regs || [];

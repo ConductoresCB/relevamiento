@@ -19,6 +19,14 @@
     return pad(orden, 3) + '-' + pad(edad, 2) + '-' + pad(cp, 4);
   }
 
+  /* ID interno del participante (1.4): letra del equipo + N° de dispositivo + N° de orden, p. ej. J1-0811.
+     Igual que el registro previo (P1-0014). No se muestra al encuestador: en pantalla se usa el código. */
+  function idParticipante(equipo, dispositivo, orden) {
+    var o = pad(orden, 4);
+    if (!equipo || !o || Number(o) < 1) return '';
+    return String(equipo).trim().toUpperCase() + String(dispositivo == null ? '' : dispositivo).trim() + '-' + o;
+  }
+
   function vacio(v) {
     return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
   }
@@ -62,12 +70,17 @@
     return { respondidas: hechas, total: vis.length };
   }
 
-  var BIO_OBLIGATORIOS = ['b_dbt_dx', 'b_sexo', 'b_peso_kg', 'b_altura_m', 'b_perimetro_cm', 'b_pas_mmhg',
+  var BIO_OBLIGATORIOS = ['b_dbt_dx', 'b_sexo', 'b_peso_kg', 'b_altura_m', 'b_perimetro_cm', 'b_pas_mmhg', 'b_pad_mmhg',
     'b_act_fisica', 'b_fyv_diario', 'b_hta_dx', 'b_med_antihta', 'b_glucosa_previa', 'b_antec_fam_dbt', 'b_fuma', 'g_acepta'];
+  // Versiones del instrumento que no preguntaban la diastólica: no se les exige para «Bio completo».
+  var SIN_DIASTOLICA = { '2026-10-v1': true };
 
   function avanceBio(reg) {
     var b = reg.bio || {};
-    var faltan = BIO_OBLIGATORIOS.filter(function (k) { return vacio(b[k]); });
+    var faltan = BIO_OBLIGATORIOS.filter(function (k) {
+      if (k === 'b_pad_mmhg' && SIN_DIASTOLICA[reg.version_instrumento]) return false;
+      return vacio(b[k]);
+    });
     if (b.g_acepta === 'Sí' && vacio(b.g_resultado_mgdl)) faltan.push('g_resultado_mgdl');
     var iniciado = Object.keys(b).some(function (k) { return !vacio(b[k]); });
     return { completo: faltan.length === 0, iniciado: iniciado, faltan: faltan,
@@ -93,7 +106,7 @@
   function siNo(v) { return v === true ? 'Sí' : v === false ? 'No' : ''; }
 
   var NUMERICOS = { orden: 1, edad: 1, p10_anios_chofer: 1, p16_horas_sin_parar: 1, p19_horas_sueno: 1,
-    b_peso_kg: 1, b_altura_m: 1, b_imc: 1, b_perimetro_cm: 1, b_pas_mmhg: 1, g_resultado_mgdl: 1,
+    b_peso_kg: 1, b_altura_m: 1, b_imc: 1, b_perimetro_cm: 1, b_pas_mmhg: 1, b_pad_mmhg: 1, g_resultado_mgdl: 1,
     g_ayuno_min: 1, fr_puntos: 1, fh_puntos: 1, socio_respondidas: 1 };
 
   function valorCelda(id, v) {
@@ -171,7 +184,7 @@
     return '﻿' + lineas.join('\r\n');
   }
 
-  var api = { pad: pad, codigo: codigo, vacio: vacio, esVisible: esVisible, respondida: respondida,
+  var api = { pad: pad, codigo: codigo, idParticipante: idParticipante, vacio: vacio, esVisible: esVisible, respondida: respondida,
     avanceSocio: avanceSocio, avanceSeccion: avanceSeccion, avanceBio: avanceBio, calcular: calcular,
     pendiente: pendiente, aplanar: aplanar, csv: csv, BIO_OBLIGATORIOS: BIO_OBLIGATORIOS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

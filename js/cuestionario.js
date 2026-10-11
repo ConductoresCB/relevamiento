@@ -17,7 +17,7 @@
   var CANTIDAD = ['1', '2', '3', '4', '5', 'Más de 5'];
 
   var CUESTIONARIO = {
-    version: '2026-10-v1',
+    version: '2026-10-v2', // v2 (app 1.4): agrega la presión diastólica en la biológica
     titulo: 'Encuesta sociodemográfica · Conductores de camiones del Corredor Bioceánico - Jujuy',
     secciones: [
       {
@@ -161,6 +161,7 @@
     { id: 'b_imc', texto: 'IMC (calculado)' },
     { id: 'b_perimetro_cm', texto: 'Perímetro abdominal (cm)' },
     { id: 'b_pas_mmhg', texto: 'Presión arterial sistólica (mmHg)' },
+    { id: 'b_pad_mmhg', texto: 'Presión arterial diastólica (mmHg)' }, // 1.4: se registra; no entra en FINDRISK ni Framingham
     { id: 'b_act_fisica', texto: '¿Hace actividad física regularmente? (al menos 30 min por día)', opciones: SI_NO },
     { id: 'b_fyv_diario', texto: '¿Consume frutas o verduras todos los días?', opciones: SI_NO },
     { id: 'b_hta_dx', texto: '¿Tiene diagnóstico de hipertensión?', opciones: SI_NO },
@@ -189,7 +190,7 @@
 
   var META = [
     { id: 'id', texto: 'Identificador único del relevamiento (generado por la app)' },
-    { id: 'participante_id', texto: 'ID estable del participante (vincula visitas)' },
+    { id: 'participante_id', texto: 'ID interno del participante (equipo, dispositivo y N° de orden)' },
     { id: 'codigo', texto: 'Código de identificación (orden-edad-código postal)' },
     { id: 'orden', texto: 'Número de orden' },
     { id: 'edad', texto: 'Edad (años cumplidos)' },

@@ -20,7 +20,7 @@
   raiz.CONFIG = {
 
     // Versión de la app. Subila con cada cambio que publiques.
-    versionApp: '1.3.1',
+    versionApp: '1.4.0',
 
     proyecto: {
       nombre: 'Relevamiento',                 // aparece en la pestaña del navegador
@@ -42,13 +42,12 @@
       relevadosHoy: 'Relevados hoy',
       sinSincronizar: 'Sin sincronizar',
       nuevoRelevamiento: 'Nuevo relevamiento',
-      buscar: 'Buscar por código, ID o celular',
+      buscar: 'Buscar por código o celular',
       relevamientosHoy: 'Relevamientos de hoy',
       cerrarJornada: 'Cerrar jornada y sincronizar',
       nuevoParticipante: 'Nuevo participante',
       identificacion: 'Identificación',
       codigoIdentificacion: 'Código de identificación',
-      participoAntes: '¿Participó en un relevamiento anterior?',
       datosContacto: 'Contacto del camionero entrevistado',
       consentimiento: 'Leyó y aceptó el consentimiento informado.',
       comparteApp: 'Acepta que sus resultados se vean en la app de camioneros.',
@@ -76,10 +75,8 @@
       encuestadoresEntrevista: 'Encuestador/es de esta entrevista',
       ayudaEncuestadores: 'Si son varios, escribí los nombres separados por «y».',
 
-      // Búsqueda del participante de una visita anterior.
-      buscarParticipante: 'Buscar al participante',
-      ayudaBuscarParticipante: 'Alcanza con una parte: los últimos números del código (por ejemplo 44-4600), el número del ID (por ejemplo 3 o A1-0003) o los últimos 4 números del celular.',
-      idParaEntregar: 'Anotáselo o pedile que le saque una foto: con este ID se lo encuentra rápido en la próxima visita.'
+      // Archivos sin cifrar (CSV): aviso que aparece en la pantalla de Administración.
+      avisoSinCifrar: 'Estos archivos NO están cifrados: guardalos solo en la computadora de análisis. No los mandes por WhatsApp ni los subas a una carpeta compartida.'
     },
 
     // Recomendación que se muestra según el riesgo de Framingham (texto del protocolo).
@@ -95,7 +92,8 @@
       peso: [35, 250],          // kg
       altura: [1.2, 2.2],       // m
       perimetro: [50, 200],     // cm
-      pas: [70, 260],           // mmHg
+      pas: [70, 260],           // mmHg, sistólica
+      pad: [40, 150],           // mmHg, diastólica
       glucemia: [20, 600]       // mg/dL
     }
   };

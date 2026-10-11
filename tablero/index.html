@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Seguridad (1.4): solo se ejecutan los programas del propio tablero y solo se piden datos al script de Google. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <title>Tablero del Relevamiento</title>
 <meta name="description" content="Tablero de análisis del Relevamiento Corredor Bioceánico (Jujuy): carga de planillas, filtros, cruces y gráficos.">
 <link rel="icon" href="../icons/icono-192.png">

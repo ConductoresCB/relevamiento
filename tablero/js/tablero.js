@@ -97,7 +97,7 @@
   /* --------------------------------------------------------- Datos */
   function recalcularTodo() {
     var u = D.unir(estado.fuentes);
-    cache.base = u.filas; cache.duplicados = u.duplicados;
+    cache.base = u.filas; cache.duplicados = u.duplicados; cache.repetidos = D.codigosRepetidos(u.filas);
     cache.participantes = D.consolidar(u.filas);
     aplicar();
   }
@@ -142,6 +142,9 @@
         }
         if (ext === 'csv' || ext === 'txt') {
           return archivo.text().then(function (txt) {
+            if (/^\s*\{[\s\S]{0,200}"paquete-relevamiento"/.test(txt)) {
+              throw new Error('«' + nombre + '» es un paquete cifrado de la app: importalo en la app (Ajustes › Importar paquetes) con la clave del equipo y enviá todo a la planilla.');
+            }
             var filas = D.leerCsv(txt);
             agregarFuente(nombre, etiquetaSugerida(nombre, filas.map(D.normalizarFila)), filas, { hoja: 'CSV' });
             aviso('«' + nombre + '»: ' + filasTxt(filas.length) + '.');
@@ -765,10 +768,10 @@
       '<p class="nota-privacidad">Los archivos se leen en este navegador y no se suben a ningún servidor. Al cerrar la pestaña, se borran de acá.</p>' +
       '<p class="sub"><strong>Planilla de Google:</strong> Archivo › Descargar › Microsoft Excel (.xlsx) y cargala acá. <strong>Planilla previa:</strong> el archivo Tablero_previo_entrevistas.xlsx.</p></div>';
     if (window.claude) html += '<div class="tarjeta"><h3>Leer directo de la planilla de Google</h3><p class="lectura">Esta opción funciona en el tablero publicado en GitHub (la misma dirección de la app, terminada en <span class="mono">/tablero/</span>). Acá podés cargar la planilla descargada como Excel.</p></div>';
-    else html += '<div class="tarjeta"><h3>Leer directo de la planilla de Google</h3><p class="sub">Necesita el script de la planilla en la versión 1.3 o posterior. Usa la misma dirección y clave que la app.</p>' +
+    else html += '<div class="tarjeta"><h3>Leer directo de la planilla de Google</h3><p class="sub">Necesita el script de la planilla 1.4. Usa la misma dirección que la app y la <strong>clave de lectura</strong>, que tiene solo la administración (no es la clave de los celulares).</p>' +
       '<label class="campo" style="max-width:none"><span>Dirección de la aplicación web (Apps Script)</span><input class="entrada" data-campo="conexion.url" value="' + esc(c.url) + '" placeholder="https://script.google.com/macros/s/…/exec"></label>' +
-      '<label class="campo" style="max-width:none"><span>Clave del equipo</span><input class="entrada" type="password" data-campo="conexion.clave" value="' + esc(c.clave) + '"></label>' +
-      '<label class="casilla"><input type="checkbox" data-campo="conexion.recordar"' + (c.recordar ? ' checked' : '') + '> Recordar la clave en esta computadora</label>' +
+      '<label class="campo" style="max-width:none"><span>Clave de lectura</span><input class="entrada" type="password" autocomplete="off" data-campo="conexion.clave" value="' + esc(c.clave) + '"></label>' +
+      '<label class="casilla"><input type="checkbox" data-campo="conexion.recordar"' + (c.recordar ? ' checked' : '') + '> Recordar la clave en esta computadora (solo si es tu computadora personal)</label>' +
       '<div class="form-fila"><button type="button" class="btn" data-accion="leer-google">Leer la planilla</button></div></div>';
     html += '</div>';
     html += '<div class="tarjeta"><h3>Planillas cargadas</h3>';
@@ -782,6 +785,12 @@
         }).join('') + '</tbody></table></div>';
       html += '<p class="sub">Unidas: ' + num(cache.base.length) + ' relevamientos de ' + num(cache.participantes.length) + ' participantes.' +
         (cache.duplicados ? ' Se descartaron ' + num(cache.duplicados) + ' filas repetidas (mismo id): quedó la versión modificada más recientemente.' : '') + '</p>';
+      if (cache.repetidos && cache.repetidos.length) {
+        html += '<p class="nota-privacidad"><strong>Revisar:</strong> ' + num(cache.repetidos.length) + (cache.repetidos.length === 1 ? ' código aparece' : ' códigos aparecen') +
+          ' en más de un relevamiento (otra persona con el mismo código, alguien entrevistado dos veces o un error de carga): ' +
+          cache.repetidos.slice(0, 12).map(function (x) { return '<span class="mono">' + esc(x.codigo) + '</span> (' + x.n + ')'; }).join(', ') +
+          (cache.repetidos.length > 12 ? '…' : '') + '.</p>';
+      }
     }
     html += '<div class="form-fila">' + (hayEjemplo() ? '<button type="button" class="btn sec" data-accion="quitar-ejemplo">Quitar los datos de ejemplo</button>' : '<button type="button" class="btn sec" data-accion="ejemplo">Cargar datos de ejemplo (ficticios)</button>') +
       (estado.fuentes.length ? '<button type="button" class="btn sec" data-accion="csv-filtrado">Descargar datos filtrados (CSV)</button>' : '') + '</div></div>';
