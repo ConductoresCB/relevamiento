@@ -20,7 +20,7 @@
   raiz.CONFIG = {
 
     // Versión de la app. Subila con cada cambio que publiques.
-    versionApp: '1.4.1',
+    versionApp: '1.4.2',
 
     proyecto: {
       nombre: 'Relevamiento',                 // aparece en la pestaña del navegador
