@@ -1,0 +1,56 @@
+{
+ "id": "7f3c2a10-ejemplo",
+ "participante_id": "A1-0010",
+ "orden": "10",
+ "edad": "44",
+ "cp": "4600",
+ "codigo": "010-44-4600",
+ "fecha": "2026-10-07",
+ "hora_inicio": "10:58",
+ "hora_fin": "11:30",
+ "equipo": "A",
+ "dispositivo": "1",
+ "encuestador": "MB",
+ "puesto": "Puesto 1",
+ "consentimiento": true,
+ "comparte_app": true,
+ "contacto": {
+  "celular": "3884000012"
+ },
+ "socio": {
+  "p01_nac_pais": "Argentina",
+  "p01_nac_detalle": "Jujuy",
+  "p02_educacion": "Secundaria completa",
+  "p06_idiomas_entiende": [
+   "Español",
+   "Portugués"
+  ],
+  "p10_anios_chofer": "18",
+  "p11_recorrido": "Viaje internacional",
+  "p16_horas_sin_parar": "4,5"
+ },
+ "bio": {
+  "b_dbt_dx": "No",
+  "b_sexo": "Varón",
+  "b_peso_kg": "86,4",
+  "b_altura_m": "1,72",
+  "b_perimetro_cm": "101",
+  "b_pas_mmhg": "138",
+  "b_pad_mmhg": "88",
+  "b_act_fisica": "No",
+  "b_fyv_diario": "No",
+  "b_hta_dx": "No",
+  "b_med_antihta": "No",
+  "b_glucosa_previa": "No",
+  "b_antec_fam_dbt": "Sí, primer grado",
+  "b_fuma": "Sí",
+  "g_acepta": "Sí",
+  "g_hora_ingesta": "08:15",
+  "g_hora_medicion": "11:20",
+  "g_que_ingirio": "Mate y pan",
+  "g_resultado_mgdl": "112"
+ },
+ "estado": "finalizado",
+ "modificado": "2026-10-07T14:30:00.000Z",
+ "version_instrumento": "2026-10-v2"
+}

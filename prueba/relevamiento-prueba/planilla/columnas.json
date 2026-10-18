@@ -1,0 +1,1171 @@
+{
+ "columnas": [
+  {
+   "id": "id",
+   "texto": "Identificador único del relevamiento (generado por la app)",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "participante_id",
+   "texto": "ID interno del participante (equipo, dispositivo y N° de orden)",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "codigo",
+   "texto": "Código de identificación (orden-edad-código postal)",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "orden",
+   "texto": "Número de orden",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "edad",
+   "texto": "Edad (años cumplidos)",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "cp",
+   "texto": "Código postal",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "fecha",
+   "texto": "Fecha del relevamiento (AAAA-MM-DD)",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "hora_inicio",
+   "texto": "Hora de inicio",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "hora_fin",
+   "texto": "Hora de cierre",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "equipo",
+   "texto": "Equipo",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "dispositivo",
+   "texto": "Dispositivo",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "encuestador",
+   "texto": "Encuestador/a",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "puesto",
+   "texto": "Puesto o lugar de relevamiento",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "consentimiento",
+   "texto": "Consentimiento informado",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "comparte_app",
+   "texto": "Acepta compartir con la app de camioneros",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "socio_respondidas",
+   "texto": "Preguntas sociodemográficas respondidas",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "socio_completo",
+   "texto": "Módulo sociodemográfico completo",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "bio_completo",
+   "texto": "Módulo biológico completo",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "gluc_realizada",
+   "texto": "Glucometría realizada",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "estado",
+   "texto": "Estado del relevamiento",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "version_instrumento",
+   "texto": "Versión del instrumento",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "modificado",
+   "texto": "Última modificación (fecha y hora)",
+   "seccion": "Identificación",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "p01_nac_pais",
+   "texto": "1. Lugar de nacimiento",
+   "seccion": "Origen y educación",
+   "opciones": [
+    "Argentina",
+    "Brasil",
+    "Chile",
+    "Paraguay",
+    "Otro país"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p01_nac_detalle",
+   "texto": "1. Provincia (si responde «Argentina»)",
+   "seccion": "Origen y educación",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p02_educacion",
+   "texto": "2. Máximo nivel educativo alcanzado",
+   "seccion": "Origen y educación",
+   "opciones": [
+    "Primaria completa",
+    "Secundaria incompleta",
+    "Secundaria completa",
+    "Terciario incompleto",
+    "Terciario completo",
+    "Universitario incompleto",
+    "Universitario completo"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p03_pareja",
+   "texto": "3. ¿Está actualmente en pareja?",
+   "seccion": "Hogar",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p04_convive",
+   "texto": "4. Cantidad de personas con que convive",
+   "seccion": "Hogar",
+   "opciones": [
+    "Ninguna (vive solo)",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "Más de 5"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p05_a_cargo",
+   "texto": "5. Cantidad de personas que tiene a cargo",
+   "seccion": "Hogar",
+   "opciones": [
+    "Ninguna",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "Más de 5"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p06_idiomas_entiende",
+   "texto": "6. ¿Qué idioma(s) entiende?",
+   "seccion": "Idiomas y licencia",
+   "opciones": [
+    "Español",
+    "Guaraní",
+    "Portugués",
+    "Inglés",
+    "Otro"
+   ],
+   "tipo": "multiple"
+  },
+  {
+   "id": "p06_otro",
+   "texto": "6. Especificar (si responde «Otro»)",
+   "seccion": "Idiomas y licencia",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p07_idiomas_habla",
+   "texto": "7. ¿Qué idioma(s) habla?",
+   "seccion": "Idiomas y licencia",
+   "opciones": [
+    "Español",
+    "Guaraní",
+    "Portugués",
+    "Inglés",
+    "Otro"
+   ],
+   "tipo": "multiple"
+  },
+  {
+   "id": "p07_otro",
+   "texto": "7. Especificar (si responde «Otro»)",
+   "seccion": "Idiomas y licencia",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p08_licencia",
+   "texto": "8. ¿En qué país obtuvo su licencia de conducir profesional?",
+   "seccion": "Idiomas y licencia",
+   "opciones": [
+    "Argentina",
+    "Brasil",
+    "Chile",
+    "Paraguay",
+    "Otro"
+   ],
+   "tipo": "multiple"
+  },
+  {
+   "id": "p08_lic_otro",
+   "texto": "8. ¿En qué país? (si responde «Otro»)",
+   "seccion": "Idiomas y licencia",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p09_rutas_jujuy",
+   "texto": "9. ¿Cómo es el estado de las rutas que recorre en Jujuy?",
+   "seccion": "Trabajo y recorrido",
+   "opciones": [
+    "Muy bueno",
+    "Bueno",
+    "Regular",
+    "Malo",
+    "Muy malo"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p10_anios_chofer",
+   "texto": "10. ¿Hace cuántos años trabaja como chofer de camión?",
+   "seccion": "Trabajo y recorrido",
+   "opciones": null,
+   "tipo": "numero"
+  },
+  {
+   "id": "p11_recorrido",
+   "texto": "11. ¿Qué recorrido está realizando ahora?",
+   "seccion": "Trabajo y recorrido",
+   "opciones": [
+    "Viaje provincial (Jujuy)",
+    "Viaje interprovincial",
+    "Viaje internacional"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p12_frec_corredor",
+   "texto": "12. ¿Con qué frecuencia realiza ese recorrido? — Otros tramos del corredor + Jujuy",
+   "seccion": "Trabajo y recorrido",
+   "opciones": [
+    "Diariamente",
+    "Una vez a la semana",
+    "2 veces por semana",
+    "3 veces por semana",
+    "Quincenalmente",
+    "Una vez al mes",
+    "Otro"
+   ],
+   "tipo": "lista"
+  },
+  {
+   "id": "p12_frec_corredor_otro",
+   "texto": "12. Especificar (si responde «Otro»)",
+   "seccion": "Trabajo y recorrido",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p12_frec_jujuy",
+   "texto": "12. ¿Con qué frecuencia realiza ese recorrido? — Tramo Jujuy",
+   "seccion": "Trabajo y recorrido",
+   "opciones": [
+    "Diariamente",
+    "Una vez a la semana",
+    "2 veces por semana",
+    "3 veces por semana",
+    "Quincenalmente",
+    "Una vez al mes",
+    "Otro"
+   ],
+   "tipo": "lista"
+  },
+  {
+   "id": "p12_frec_jujuy_otro",
+   "texto": "12. Especificar (si responde «Otro»)",
+   "seccion": "Trabajo y recorrido",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p13_relacion_laboral",
+   "texto": "13. ¿Cuál es su relación laboral actual?",
+   "seccion": "Trabajo y recorrido",
+   "opciones": [
+    "Empleado",
+    "Dueño del camión",
+    "Otro"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p13_otro",
+   "texto": "13. Especificar (si responde «Otro»)",
+   "seccion": "Trabajo y recorrido",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p14_conformidad",
+   "texto": "14. ¿Cómo se siente con su situación laboral actual?",
+   "seccion": "Trabajo y recorrido",
+   "opciones": [
+    "Conforme",
+    "Parcialmente conforme",
+    "Disconforme"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p15_riesgo_salud",
+   "texto": "15. ¿Cree que su trabajo representa un riesgo para su salud?",
+   "seccion": "Trabajo y recorrido",
+   "opciones": [
+    "Sí",
+    "No",
+    "Duda"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p16_horas_sin_parar",
+   "texto": "16. Por lo general, ¿cuántas horas conduce sin hacer paradas?",
+   "seccion": "Trabajo y recorrido",
+   "opciones": null,
+   "tipo": "numero"
+  },
+  {
+   "id": "p17_paradas",
+   "texto": "17. ¿Realiza paradas durante su recorrido?",
+   "seccion": "Trabajo y recorrido",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p18_donde_come",
+   "texto": "18. ¿Dónde suele comer durante los viajes?",
+   "seccion": "Hábitos en ruta",
+   "opciones": [
+    "Paradores",
+    "En el camión al costado de la ruta",
+    "Estaciones de servicio",
+    "En casas de familiares o conocidos",
+    "Otro"
+   ],
+   "tipo": "multiple"
+  },
+  {
+   "id": "p18_otro",
+   "texto": "18. Especificar (si responde «Otro»)",
+   "seccion": "Hábitos en ruta",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p19_horas_sueno",
+   "texto": "19. ¿Cuántas horas duerme por día?",
+   "seccion": "Hábitos en ruta",
+   "opciones": null,
+   "tipo": "numero"
+  },
+  {
+   "id": "p20_frutas_verduras",
+   "texto": "20. ¿Con qué frecuencia consume frutas y verduras mientras está en ruta?",
+   "seccion": "Hábitos en ruta",
+   "opciones": [
+    "Todos los días",
+    "Varias veces por semana",
+    "Casi nunca",
+    "Nunca"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p21_bebidas",
+   "texto": "21. ¿Qué bebidas consume durante sus viajes?",
+   "seccion": "Hábitos en ruta",
+   "opciones": [
+    "Agua",
+    "Jugos artificiales",
+    "Jugos naturales",
+    "Gaseosas",
+    "Café",
+    "Té",
+    "Mate",
+    "Otro"
+   ],
+   "tipo": "multiple"
+  },
+  {
+   "id": "p21_otro",
+   "texto": "21. Especificar (si responde «Otro»)",
+   "seccion": "Hábitos en ruta",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p22_sanitarios",
+   "texto": "22. ¿Suele tener acceso a sanitarios en sus recorridos?",
+   "seccion": "Hábitos en ruta",
+   "opciones": [
+    "Sí, siempre",
+    "A veces",
+    "Casi nunca",
+    "Nunca"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p23_recreativas",
+   "texto": "23. ¿Dedica tiempo al mes a actividades recreativas (cine, paseos, deporte, etc.)?",
+   "seccion": "Hábitos en ruta",
+   "opciones": [
+    "Sí",
+    "Algunas veces",
+    "Rara vez",
+    "No"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p24_siniestro",
+   "texto": "24. ¿Ha tenido algún siniestro vial en el último año?",
+   "seccion": "Economía y salud",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p25_fin_de_mes",
+   "texto": "25. Con lo que gana, ¿llega a fin de mes?",
+   "seccion": "Economía y salud",
+   "opciones": [
+    "Sí",
+    "Parcialmente",
+    "No"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p26_cobertura",
+   "texto": "26. ¿Tiene cobertura médica?",
+   "seccion": "Economía y salud",
+   "opciones": [
+    "Obra social",
+    "Prepaga",
+    "Seguro de salud",
+    "Ninguna"
+   ],
+   "tipo": "multiple"
+  },
+  {
+   "id": "p27_control_medico",
+   "texto": "27. ¿Dónde recurre para control médico?",
+   "seccion": "Economía y salud",
+   "opciones": [
+    "Sistema público",
+    "Sistema privado",
+    "Ninguno"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p28_frec_consulta",
+   "texto": "28. ¿Con qué frecuencia consulta al médico, aunque no presente síntomas?",
+   "seccion": "Economía y salud",
+   "opciones": [
+    "Una vez al mes",
+    "2 veces al año",
+    "Una vez al año",
+    "Solo cuando me siento mal",
+    "Nunca"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p29_atencion_dolencias",
+   "texto": "29. ¿Dónde recurre para atención de dolencias, malestar o síntomas?",
+   "seccion": "Economía y salud",
+   "opciones": [
+    "Sistema público",
+    "Sistema privado",
+    "Otros (medicina tradicional, alternativa, etc.)",
+    "Ninguno"
+   ],
+   "tipo": "multiple"
+  },
+  {
+   "id": "p30_dolores",
+   "texto": "30. ¿Tiene dolores frecuentes en alguna parte del cuerpo?",
+   "seccion": "Economía y salud",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p30_cuales",
+   "texto": "30. ¿Qué dolores corporales presenta? (si responde «Sí»)",
+   "seccion": "Economía y salud",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p31_automedicacion",
+   "texto": "31. Sin indicación médica, suele tomar:",
+   "seccion": "Economía y salud",
+   "opciones": [
+    "Medicamentos",
+    "Hierbas",
+    "Ninguno"
+   ],
+   "tipo": "multiple"
+  },
+  {
+   "id": "p32_cuales_med",
+   "texto": "32. ¿Qué medicamentos o hierbas toma?",
+   "seccion": "Economía y salud",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p33_diagnosticos",
+   "texto": "33. Actualmente, ¿ha sido diagnosticado con alguna enfermedad?",
+   "seccion": "Economía y salud",
+   "opciones": [
+    "No tengo diagnóstico de enfermedad",
+    "Musculoesqueléticos",
+    "Renal",
+    "Ocular",
+    "Digestivas",
+    "Auditivo",
+    "Respiratorias",
+    "Obesidad",
+    "Osteoarticular",
+    "VIH/SIDA",
+    "Otros"
+   ],
+   "tipo": "multiple"
+  },
+  {
+   "id": "p33_otro",
+   "texto": "33. Especificar (si responde «Otros»)",
+   "seccion": "Economía y salud",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p34_actividad_fisica",
+   "texto": "34. ¿Con qué frecuencia realiza actividad física fuera del trabajo?",
+   "seccion": "Consumos y vínculos",
+   "opciones": [
+    "Varias veces a la semana (4 o más)",
+    "2 a 3 veces por semana",
+    "Una vez a la semana",
+    "Rara vez",
+    "Nunca"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p35_energeticas",
+   "texto": "35. ¿Consume bebidas energéticas durante sus viajes?",
+   "seccion": "Consumos y vínculos",
+   "opciones": [
+    "No",
+    "Café",
+    "Coca-Cola",
+    "Pepsi-Cola",
+    "Yerba mate",
+    "Energizantes (Speed, Monster, Red Bull, etc.)",
+    "Otro"
+   ],
+   "tipo": "multiple"
+  },
+  {
+   "id": "p35_otro",
+   "texto": "35. Especificar (si responde «Otro»)",
+   "seccion": "Consumos y vínculos",
+   "opciones": null,
+   "tipo": "texto"
+  },
+  {
+   "id": "p36_coquea",
+   "texto": "36. ¿Usted coquea?",
+   "seccion": "Consumos y vínculos",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p37_alcohol",
+   "texto": "37. ¿Consume bebidas alcohólicas? (en horario NO laboral)",
+   "seccion": "Consumos y vínculos",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p38_comunicacion",
+   "texto": "38. ¿Con qué frecuencia se comunica con colegas durante sus viajes?",
+   "seccion": "Consumos y vínculos",
+   "opciones": [
+    "Siempre",
+    "A veces",
+    "Nunca"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "p39_comparte_trayectos",
+   "texto": "39. ¿Suele compartir trayectos con otros choferes?",
+   "seccion": "Consumos y vínculos",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": "unica"
+  },
+  {
+   "id": "b_dbt_dx",
+   "texto": "¿Tiene diagnóstico de diabetes?",
+   "seccion": "Biológica",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": ""
+  },
+  {
+   "id": "b_sexo",
+   "texto": "Sexo",
+   "seccion": "Biológica",
+   "opciones": [
+    "Mujer",
+    "Varón",
+    "Otro"
+   ],
+   "tipo": ""
+  },
+  {
+   "id": "b_peso_kg",
+   "texto": "Peso (kg)",
+   "seccion": "Biológica",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "b_altura_m",
+   "texto": "Altura (m)",
+   "seccion": "Biológica",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "b_imc",
+   "texto": "IMC (calculado)",
+   "seccion": "Biológica",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "b_perimetro_cm",
+   "texto": "Perímetro abdominal (cm)",
+   "seccion": "Biológica",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "b_pas_mmhg",
+   "texto": "Presión arterial sistólica (mmHg)",
+   "seccion": "Biológica",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "b_pad_mmhg",
+   "texto": "Presión arterial diastólica (mmHg)",
+   "seccion": "Biológica",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "b_act_fisica",
+   "texto": "¿Hace actividad física regularmente? (al menos 30 min por día)",
+   "seccion": "Biológica",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": ""
+  },
+  {
+   "id": "b_fyv_diario",
+   "texto": "¿Consume frutas o verduras todos los días?",
+   "seccion": "Biológica",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": ""
+  },
+  {
+   "id": "b_hta_dx",
+   "texto": "¿Tiene diagnóstico de hipertensión?",
+   "seccion": "Biológica",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": ""
+  },
+  {
+   "id": "b_med_antihta",
+   "texto": "¿Toma medicación antihipertensiva?",
+   "seccion": "Biológica",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": ""
+  },
+  {
+   "id": "b_glucosa_previa",
+   "texto": "¿Tuvo glucosa elevada en sangre alguna vez?",
+   "seccion": "Biológica",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": ""
+  },
+  {
+   "id": "b_antec_fam_dbt",
+   "texto": "Antecedentes familiares de diabetes",
+   "seccion": "Biológica",
+   "opciones": [
+    "No",
+    "Sí, parientes lejanos",
+    "Sí, primer grado"
+   ],
+   "tipo": ""
+  },
+  {
+   "id": "b_fuma",
+   "texto": "¿Fuma tabaco?",
+   "seccion": "Biológica",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": ""
+  },
+  {
+   "id": "g_acepta",
+   "texto": "¿Acepta evaluarse el nivel de azúcar en sangre?",
+   "seccion": "Biológica",
+   "opciones": [
+    "Sí",
+    "No"
+   ],
+   "tipo": ""
+  },
+  {
+   "id": "g_hora_ingesta",
+   "texto": "Hora de la última ingesta (líquido o sólido)",
+   "seccion": "Biológica",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "g_que_ingirio",
+   "texto": "¿Qué comió o bebió?",
+   "seccion": "Biológica",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "g_hora_medicion",
+   "texto": "Hora de la medición",
+   "seccion": "Biológica",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "g_resultado_mgdl",
+   "texto": "Resultado de glucometría periférica (mg/dL)",
+   "seccion": "Biológica",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "g_ayuno_min",
+   "texto": "Minutos de ayuno (calculado)",
+   "seccion": "Calculados",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "fr_aplica",
+   "texto": "FINDRISK: ¿corresponde aplicarlo?",
+   "seccion": "Calculados",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "fr_puntos",
+   "texto": "FINDRISK: puntaje total",
+   "seccion": "Calculados",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "fr_categoria",
+   "texto": "FINDRISK: nivel de riesgo",
+   "seccion": "Calculados",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "fr_probabilidad",
+   "texto": "FINDRISK: probabilidad de diabetes a 10 años",
+   "seccion": "Calculados",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "fh_aplica",
+   "texto": "Framingham: ¿corresponde aplicarlo?",
+   "seccion": "Calculados",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "fh_puntos",
+   "texto": "Framingham: puntaje total",
+   "seccion": "Calculados",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "fh_riesgo",
+   "texto": "Framingham: riesgo a 10 años (%)",
+   "seccion": "Calculados",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "fh_categoria",
+   "texto": "Framingham: categoría de riesgo",
+   "seccion": "Calculados",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "consent_puncion",
+   "texto": "Consentimiento: acepta la punción en el dedo",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "consent_grabacion",
+   "texto": "Consentimiento: acepta que se grabe la conversación",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "consent_firma",
+   "texto": "Consentimiento firmado en papel",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "audio_archivos",
+   "texto": "Archivos de audio de la entrevista (en el celular)",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "audio_minutos",
+   "texto": "Minutos grabados",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "ent_marcas",
+   "texto": "Minuto en que empieza cada parte de la grabación",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "ent_personal",
+   "texto": "Entrevista · Personal: preguntas tratadas / total",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "ent_familia",
+   "texto": "Entrevista · Familia: preguntas tratadas / total",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "ent_laboral",
+   "texto": "Entrevista · Laboral y trayectoria: preguntas tratadas / total",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "ent_trabajo_salud",
+   "texto": "Entrevista · Trabajo y salud: preguntas tratadas / total",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "ent_salud",
+   "texto": "Entrevista · Salud, enfermedad y cuidado: preguntas tratadas / total",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "ent_entorno",
+   "texto": "Entrevista · Entorno social y consumos: preguntas tratadas / total",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  },
+  {
+   "id": "ent_bioceanico",
+   "texto": "Entrevista · Corredor bioceánico: preguntas tratadas / total",
+   "seccion": "Entrevista",
+   "opciones": null,
+   "tipo": ""
+  }
+ ],
+ "contacto": [
+  "id",
+  "participante_id",
+  "codigo",
+  "correo",
+  "celular",
+  "consentimiento",
+  "comparte_app",
+  "fecha"
+ ],
+ "ejemplo": {
+  "id": "7f3c2a10-ejemplo",
+  "participante_id": "A1-0010",
+  "codigo": "010-44-4600",
+  "orden": 10,
+  "edad": 44,
+  "cp": "4600",
+  "fecha": "2026-10-07",
+  "hora_inicio": "10:58",
+  "hora_fin": "11:30",
+  "equipo": "A",
+  "dispositivo": "1",
+  "encuestador": "MB",
+  "puesto": "Puesto 1",
+  "consentimiento": "Sí",
+  "comparte_app": "Sí",
+  "socio_respondidas": 6,
+  "socio_completo": "No",
+  "bio_completo": "Sí",
+  "gluc_realizada": "Sí",
+  "estado": "finalizado",
+  "version_instrumento": "2026-10-v2",
+  "modificado": "2026-10-07T14:30:00.000Z",
+  "p01_nac_pais": "Argentina",
+  "p01_nac_detalle": "Jujuy",
+  "p02_educacion": "Secundaria completa",
+  "p03_pareja": "",
+  "p04_convive": "",
+  "p05_a_cargo": "",
+  "p06_idiomas_entiende": "Español; Portugués",
+  "p06_otro": "",
+  "p07_idiomas_habla": "",
+  "p07_otro": "",
+  "p08_licencia": "",
+  "p08_lic_otro": "",
+  "p09_rutas_jujuy": "",
+  "p10_anios_chofer": 18,
+  "p11_recorrido": "Viaje internacional",
+  "p12_frec_corredor": "",
+  "p12_frec_corredor_otro": "",
+  "p12_frec_jujuy": "",
+  "p12_frec_jujuy_otro": "",
+  "p13_relacion_laboral": "",
+  "p13_otro": "",
+  "p14_conformidad": "",
+  "p15_riesgo_salud": "",
+  "p16_horas_sin_parar": 4.5,
+  "p17_paradas": "",
+  "p18_donde_come": "",
+  "p18_otro": "",
+  "p19_horas_sueno": "",
+  "p20_frutas_verduras": "",
+  "p21_bebidas": "",
+  "p21_otro": "",
+  "p22_sanitarios": "",
+  "p23_recreativas": "",
+  "p24_siniestro": "",
+  "p25_fin_de_mes": "",
+  "p26_cobertura": "",
+  "p27_control_medico": "",
+  "p28_frec_consulta": "",
+  "p29_atencion_dolencias": "",
+  "p30_dolores": "",
+  "p30_cuales": "",
+  "p31_automedicacion": "",
+  "p32_cuales_med": "",
+  "p33_diagnosticos": "",
+  "p33_otro": "",
+  "p34_actividad_fisica": "",
+  "p35_energeticas": "",
+  "p35_otro": "",
+  "p36_coquea": "",
+  "p37_alcohol": "",
+  "p38_comunicacion": "",
+  "p39_comparte_trayectos": "",
+  "b_dbt_dx": "No",
+  "b_sexo": "Varón",
+  "b_peso_kg": 86.4,
+  "b_altura_m": 1.72,
+  "b_imc": 29.2,
+  "b_perimetro_cm": 101,
+  "b_pas_mmhg": 138,
+  "b_pad_mmhg": 88,
+  "b_act_fisica": "No",
+  "b_fyv_diario": "No",
+  "b_hta_dx": "No",
+  "b_med_antihta": "No",
+  "b_glucosa_previa": "No",
+  "b_antec_fam_dbt": "Sí, primer grado",
+  "b_fuma": "Sí",
+  "g_acepta": "Sí",
+  "g_hora_ingesta": "08:15",
+  "g_que_ingirio": "Mate y pan",
+  "g_hora_medicion": "11:20",
+  "g_resultado_mgdl": 112,
+  "g_ayuno_min": 185,
+  "fr_aplica": "Sí",
+  "fr_puntos": 12,
+  "fr_categoria": "Moderado",
+  "fr_probabilidad": "17 %",
+  "fh_aplica": "Sí",
+  "fh_puntos": 7,
+  "fh_riesgo": "3",
+  "fh_categoria": "Bajo",
+  "consent_puncion": "",
+  "consent_grabacion": "",
+  "consent_firma": "",
+  "audio_archivos": "",
+  "audio_minutos": "",
+  "ent_marcas": "",
+  "ent_personal": "",
+  "ent_familia": "",
+  "ent_laboral": "",
+  "ent_trabajo_salud": "",
+  "ent_salud": "",
+  "ent_entorno": "",
+  "ent_bioceanico": ""
+ }
+}
