@@ -107,7 +107,7 @@
 
   var NUMERICOS = { orden: 1, edad: 1, p10_anios_chofer: 1, p16_horas_sin_parar: 1, p19_horas_sueno: 1,
     b_peso_kg: 1, b_altura_m: 1, b_imc: 1, b_perimetro_cm: 1, b_pas_mmhg: 1, b_pad_mmhg: 1, g_resultado_mgdl: 1,
-    g_ayuno_min: 1, fr_puntos: 1, fh_puntos: 1, socio_respondidas: 1 };
+    g_ayuno_min: 1, audio_minutos: 1, fr_puntos: 1, fh_puntos: 1, socio_respondidas: 1 };
 
   function valorCelda(id, v) {
     if (vacio(v)) return '';
@@ -130,6 +130,7 @@
       gluc_realizada: siNo(ab.glucemia), estado: reg.estado || 'borrador',
       version_instrumento: reg.version_instrumento || Inst.CUESTIONARIO.version, modificado: reg.modificado || ''
     };
+    var ENT = entrevistaFila(reg);
     var fila = {};
     var visibles = {};
     preguntasVisibles(resp).forEach(function (p) { visibles[p.id] = true; });
@@ -146,6 +147,7 @@
       else if (id === 'fh_puntos') v = c.framingham.completo ? c.framingham.puntos : '';
       else if (id === 'fh_riesgo') v = c.framingham.completo ? c.framingham.riesgo : '';
       else if (id === 'fh_categoria') v = c.framingham.completo ? c.framingham.categoria : '';
+      else if (ENT[id] !== undefined) v = ENT[id];
       else if (id.charAt(0) === 'b' || id.charAt(0) === 'g') v = b[id];
       else v = resp[id];
       // Preguntas ocultas por un salto no se exportan
@@ -157,6 +159,23 @@
       correo: k.correo || '', celular: k.celular || '', consentimiento: siNo(reg.consentimiento),
       comparte_app: siNo(reg.comparte_app), fecha: reg.fecha };
     return { fila: fila, contacto: contacto };
+  }
+
+  /* Columnas de la versión de prueba 1.5: consentimiento detallado, audio y entrevista (sin respuestas: solo qué se trató). */
+  function entrevistaFila(reg) {
+    var c = reg.consent || {}, e = reg.entrevista || {}, a = reg.audio || {}, t = e.tildadas || {};
+    var o = {
+      consent_puncion: c.puncion || '', consent_grabacion: c.grabacion || '',
+      consent_firma: c.firma === true ? 'Sí' : c.firma === false ? 'No' : '',
+      audio_archivos: (a.archivos || []).join('; '),
+      audio_minutos: a.segundos ? Math.round(a.segundos / 6) / 10 : '',
+      ent_marcas: (e.marcas || []).map(function (m) { return m.parte + ' ' + m.t; }).join('; ')
+    };
+    (Inst.ENTREVISTA || []).forEach(function (x) {
+      var n = (t[x.id] || []).length;
+      o['ent_' + x.id] = (reg.consent && reg.consent.grabacion) || n ? n + '/' + x.preguntas.length : '';
+    });
+    return o;
   }
 
   var principales = null;

@@ -19,7 +19,7 @@
   var A_CARGO = ['Ninguna', '1', '2', '3', '4', '5', 'Más de 5'];
 
   var CUESTIONARIO = {
-    version: '2026-10-v2', // v2 (app 1.4): diastólica en la biológica; «Ninguna» en las preguntas 4 y 5; la 8 pregunta el país de la licencia
+    version: '2026-10-v3-prueba', // v2 (app 1.4): diastólica; «Ninguna» en 4 y 5; país de la licencia. v3 (prueba 1.5): consentimiento detallado, grabación y entrevista integrada
     titulo: 'Encuesta sociodemográfica · Conductores de camiones del Corredor Bioceánico - Jujuy',
     secciones: [
       {
@@ -212,6 +212,53 @@
 
   var CONTACTO = ['id', 'participante_id', 'codigo', 'correo', 'celular', 'consentimiento', 'comparte_app', 'fecha'];
 
+  /* ENTREVISTA EN PROFUNDIDAD (versión de prueba 1.5).
+     Solo las preguntas de la guía de entrevista que NO están en la encuesta (para no repetir lo que ya se preguntó
+     de forma cerrada). Cada eje se muestra como un recuadro «Para profundizar» al final de la sección indicada
+     (0 = primera sección) — la misma sección donde la encuesta estructurada toca ese tema, para tildarlo mientras
+     se está hablando de eso. «Corredor bioceánico» es la excepción: ninguna sección de la encuesta lo cubre, así
+     que, siguiendo el orden real de la entrevista (empieza ahí, justo después de lo personal), va en la sección 0,
+     junto con Personal.
+     No son preguntas para cargar respuestas: el encuestador tilda las que ya salieron en la charla (queda en la grabación). */
+  var ENTREVISTA = [
+    { id: 'personal', titulo: 'Personal', seccion: 0, preguntas: [
+      '¿Dónde vive actualmente?', '¿Terminó los estudios? Si no, ¿por qué?'] },
+    { id: 'bioceanico', titulo: 'Corredor bioceánico', seccion: 0, preguntas: [
+      '¿Qué conoce del corredor bioceánico? ¿Cómo se enteró?', '¿Qué considera que debería tener el corredor?',
+      '¿Fue consultado respecto al corredor?', '¿Recibió capacitación o asesoramiento? ¿De quién?',
+      '¿Qué cambios le haría al corredor?'] },
+    { id: 'familia', titulo: 'Familia', seccion: 1, preguntas: [
+      '¿Quiénes conforman su familia?', '¿Cuánto tiempo pasa con la familia?', '¿Qué hace cuando está en familia?',
+      '¿Se comunica con su familia durante el viaje?'] },
+    { id: 'laboral', titulo: 'Laboral y trayectoria', seccion: 3, preguntas: [
+      '¿Cómo comenzó a trabajar de camionero?', '¿Alguien de su familia trabajó como camionero?', '¿Le gusta ser camionero?',
+      '¿Le hubiera gustado trabajar en otra cosa?', '¿Nota diferencias en las rutas entre provincias o países?',
+      '¿Cómo es su trabajo antes de salir y durante el viaje?', '¿Cambia la rutina según el tipo de carga?',
+      '¿Cuánto tiempo pasa trabajando fuera de su casa?', '¿Hace changas u otros recorridos para completar ingresos?'] },
+    { id: 'trabajo_salud', titulo: 'Trabajo y salud', seccion: 4, preguntas: [
+      '¿Cómo ve la salud en relación con su trabajo?', '¿Para qué y dónde hace sus paradas?',
+      'Paradores: habilitación, estado, seguridad, comida', '¿Duerme en la cabina del camión?',
+      '¿Qué come mientras maneja o cuando para?', 'En su casa, ¿come lo mismo que en los viajes?',
+      'En los descansos, ¿hace actividad física o estiramientos?', '¿Cuánto tiempo al mes dedica a la recreación?'] },
+    { id: 'salud', titulo: 'Salud, enfermedad y cuidado', seccion: 5, preguntas: [
+      '¿Qué es para usted estar saludable?', '¿Cuándo diría que alguien está enfermo?',
+      'Cuando tiene un malestar, ¿cómo lo resuelve?', '¿Va al médico o lo resuelve de otra manera?',
+      '¿Zumbidos, palpitaciones, entumecimiento, mareos, visión borrosa, falta de aire?',
+      '¿Qué hierbas o yuyos toma?'] },
+    { id: 'entorno', titulo: 'Entorno social y consumos', seccion: 6, preguntas: [
+      '¿El contacto con otros choferes le sirve de apoyo en el viaje?',
+      'Alcohol: ¿cuándo, qué tipo de bebida y con qué frecuencia?'] }
+  ];
+
+  var COLUMNAS_ENTREVISTA = [
+    { id: 'consent_puncion', texto: 'Consentimiento: acepta la punción en el dedo' },
+    { id: 'consent_grabacion', texto: 'Consentimiento: acepta que se grabe la conversación' },
+    { id: 'consent_firma', texto: 'Consentimiento firmado en papel' },
+    { id: 'audio_archivos', texto: 'Archivos de audio de la entrevista (en el celular)' },
+    { id: 'audio_minutos', texto: 'Minutos grabados' },
+    { id: 'ent_marcas', texto: 'Minuto en que empieza cada parte de la grabación' }
+  ].concat(ENTREVISTA.map(function (e) { return { id: 'ent_' + e.id, texto: 'Entrevista · ' + e.titulo + ': preguntas tratadas / total' }; }));
+
   /* Lista ordenada de columnas de la hoja "Datos" con su descripción. */
   function columnas() {
     var cols = META.slice();
@@ -233,11 +280,12 @@
     });
     BIO.forEach(function (b) { cols.push({ id: b.id, texto: b.texto, opciones: b.opciones, seccion: 'Biológica' }); });
     CALCULADOS.forEach(function (b) { cols.push({ id: b.id, texto: b.texto, seccion: 'Calculados' }); });
+    COLUMNAS_ENTREVISTA.forEach(function (b) { cols.push({ id: b.id, texto: b.texto, seccion: 'Entrevista' }); });
     return cols;
   }
 
   var api = { CUESTIONARIO: CUESTIONARIO, BIO: BIO, CALCULADOS: CALCULADOS, META: META,
-    CONTACTO: CONTACTO, columnas: columnas };
+    CONTACTO: CONTACTO, ENTREVISTA: ENTREVISTA, columnas: columnas };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.Instrumento = api;
 })(typeof window !== 'undefined' ? window : this);

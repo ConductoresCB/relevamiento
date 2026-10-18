@@ -20,10 +20,16 @@
   raiz.CONFIG = {
 
     // Versión de la app. Subila con cada cambio que publiques.
-    versionApp: '1.4.2',
+    versionApp: '1.5.3-prueba',
+
+    // VERSIÓN DE PRUEBA: guarda sus datos y su copia sin señal APARTE de la app principal,
+    // aunque las dos estén en el mismo celular. No cambiar estos nombres.
+    almacen: 'relevamiento-corredor-prueba',
+    prefijoCache: 'prueba-relevamiento',
+    esPrueba: true,
 
     proyecto: {
-      nombre: 'Relevamiento',                 // aparece en la pestaña del navegador
+      nombre: 'Relevamiento PRUEBA',                 // aparece en la pestaña del navegador
       lugar: 'Corredor Bioceánico · Jujuy'    // aparece arriba de "Jornada del…"
     },
 
@@ -78,6 +84,16 @@
       // Archivos sin cifrar (CSV): aviso que aparece en la pantalla de Administración.
       avisoSinCifrar: 'Estos archivos NO están cifrados: guardalos solo en la computadora de análisis. No los mandes por WhatsApp ni los subas a una carpeta compartida.'
     },
+
+    // Consentimiento (pantalla «Antes de empezar»): resumen que se le lee al camionero.
+    consentimientoResumen: [
+      'Proyecto de la UNJu sobre riesgo cardiovascular en camioneros del corredor.',
+      'Encuesta, medidas del cuerpo, presión y una punción en el dedo.',
+      'Puede negarse o retirarse en cualquier momento, sin costo ni pago.',
+      'Todo es confidencial.'
+    ],
+    // Texto completo del consentimiento aprobado (opcional). Si se completa, aparece «Ver el texto completo».
+    consentimientoTexto: '',
 
     // Recomendación que se muestra según el riesgo de Framingham (texto del protocolo).
     recomendacionFramingham: {
