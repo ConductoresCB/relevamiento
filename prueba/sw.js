@@ -10,7 +10,7 @@
  * letra por letra, el navegador no se entera de que hay una versión nueva y sigue usando
  * la app vieja aunque config.js y los demás archivos ya se hayan actualizado.
  */
-// build: 1.5.1-prueba
+// build: 1.5.3-prueba
 importScripts('js/config.js');
 var PREFIJO = (self.CONFIG && self.CONFIG.prefijoCache) || 'relevamiento';
 var VERSION = PREFIJO + '-' + ((self.CONFIG && self.CONFIG.versionApp) || '1');
