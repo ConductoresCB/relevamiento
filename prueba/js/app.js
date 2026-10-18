@@ -41,7 +41,7 @@
 
   var estado = { ajustes: null, registros: [], actual: null, ruta: { vista: 'jornada' }, buscar: '', verTodos: false,
     instalar: null, sincronizando: false, mensajeSync: '', mensajeConexion: '', importacion: [],
-    online: navigator.onLine, persistente: null, bitacora: [], audios: [], profAbierto: {} };
+    online: navigator.onLine, persistente: null, bitacora: [], audios: [], profAbierto: {}, pendAbierto: {}, tildadoFinal: {} };
   var Gr = window.Grabacion;
   var ENT = I.ENTREVISTA || [];
   var esPrueba = !!CFG.esPrueba;
@@ -339,7 +339,8 @@
       (estado.online ? '<span class="chip-red con">' + ico('senal', 18) + esc(T.conSenal) + '</span>' : '<span class="chip-red sin">' + ico('sinSenal', 18) + esc(T.sinSenal) + '</span>') +
       '<a class="icono-btn" href="#/ajustes" aria-label="Ajustes del dispositivo">' + ico('ajustes', 20) + '</a></div></div>' +
       '<div class="linea-dispositivo">' + ico('celu', 18) + '<span>Equipo ' + esc(aj.equipo) + ' · Dispositivo ' + esc(aj.dispositivo) +
-      ' · códigos ' + R.pad(aj.ordenDesde, 3) + '–' + R.pad(aj.ordenHasta, 3) + (aj.puesto ? ' · ' + esc(aj.puesto) : '') + (aj.encuestador ? ' · ' + esc(aj.encuestador) : '') + '</span></div>';
+      ' · códigos ' + R.pad(aj.ordenDesde, 3) + '–' + R.pad(aj.ordenHasta, 3) + (aj.puesto ? ' · ' + esc(aj.puesto) : '') + (aj.encuestador ? ' · ' + esc(aj.encuestador) : '') + '</span></div>' +
+      (errorRango(aj) ? '<a class="error-linea" href="#/ajustes">' + ico('alerta', 18) + 'Revisá el rango de orden en Ajustes: ' + esc(errorRango(aj)) + '</a>' : '');
 
     if (falta) {
       html += '<div class="tarjeta aviso"><p><b>Falta configurar este dispositivo.</b> Cargá encuestador/a, equipo, la dirección de la planilla y la clave del equipo para poder enviar y generar paquetes.</p>' +
@@ -386,8 +387,23 @@
   }
 
   /* ---------- Participante ---------- */
+  /* El N° de orden es la primera parte del código (3 cifras): el rango de cada dispositivo tiene que caber en 1–999. */
+  function errorRango(aj) {
+    var d = num(aj.ordenDesde), h = num(aj.ordenHasta);
+    if (d === null || h === null) return 'Completá «Orden desde» y «Orden hasta».';
+    if (d < 1 || h > 999 || d % 1 || h % 1) return 'El N° de orden tiene 3 cifras: el rango tiene que estar entre 1 y 999 (por ejemplo, de 200 a 399).';
+    if (d > h) return '«Orden desde» tiene que ser menor que «Orden hasta».';
+    return '';
+  }
+  REGIONES.rango = function () {
+    var e = errorRango(estado.ajustes);
+    return e ? '<span class="error-linea">' + ico('alerta', 18) + esc(e) + '</span>' : '';
+  };
+
   function siguienteOrden() {
-    var aj = estado.ajustes, d = Number(aj.ordenDesde) || 1, h = Number(aj.ordenHasta) || 999;
+    var aj = estado.ajustes;
+    if (errorRango(aj)) return '';   // con el rango mal cargado no se sugiere nada: se escribe a mano o se corrige en Ajustes
+    var d = Number(aj.ordenDesde), h = Number(aj.ordenHasta);
     var usados = estado.registros.filter(function (r) {
       return r.equipo === aj.equipo && String(r.dispositivo) === String(aj.dispositivo);
     }).map(function (r) { return Number(r.orden); }).filter(function (n) { return n >= d && n <= h; });
@@ -406,7 +422,8 @@
   function erroresIdentificacion(r) {
     var e = [];
     var o = num(r.orden), ed = num(r.edad), rep = ordenRepetido(r);
-    if (o === null || o < 1 || o > 999 || o % 1) e.push('El número de orden debe ser de 1 a 999.');
+    if (o === null) e.push('Falta el N° de orden.');
+    else if (o < 1 || o > 999 || o % 1) e.push('El N° de orden tiene 3 cifras (de 1 a 999). Si el rango de Ajustes empieza en 1000 o más, corregilo ahí.');
     if (rep) e.push('El N° de orden ' + o + ' ya se usó en este dispositivo (código ' + (rep.codigo || 'sin completar') + ').');
     if (ed === null || ed < RANGOS.edad[0] || ed > RANGOS.edad[1] || ed % 1) e.push('La edad debe ser un número entero entre ' + RANGOS.edad[0] + ' y ' + RANGOS.edad[1] + '.');
     if (!/^\d{4}$/.test(String(r.cp || ''))) e.push('El código postal debe tener 4 dígitos.');
@@ -417,9 +434,10 @@
 
   REGIONES.codigo = function () {
     var r = estado.actual; if (!r) return '';
-    var rep = ordenRepetido(r);
+    var rep = ordenRepetido(r), o = num(r.orden), fuera = o !== null && (o < 1 || o > 999 || o % 1);
     return '<div class="placa"><span class="valor">' + esc(r.codigo || '___-__-____') + '</span><span class="partes">orden · edad · código postal</span></div>' +
-      (rep ? '<span class="error-linea">' + ico('alerta', 18) + 'Ese N° de orden ya se usó en este dispositivo (código ' + esc(rep.codigo || 'sin completar') + ')</span>'
+      (fuera ? '<span class="error-linea">' + ico('alerta', 18) + 'El N° de orden tiene 3 cifras: va de 1 a 999</span>'
+        : rep ? '<span class="error-linea">' + ico('alerta', 18) + 'Ese N° de orden ya se usó en este dispositivo (código ' + esc(rep.codigo || 'sin completar') + ')</span>'
         : r.codigo ? '<span class="ok-linea">' + ico('check', 18) + 'Código libre en este dispositivo</span>' : '<span class="ayuda">Completá orden, edad y código postal.</span>');
   };
 
@@ -746,7 +764,8 @@
     return '<main class="pantalla">' + barra('#/jornada', 'Este dispositivo', 'Ajustes') +
       '<section class="tarjeta"><h2 class="seccion">Equipo y dispositivo</h2>' +
       '<div class="grilla-campos">' + campo('equipo', 'Equipo', { placeholder: 'A' }) + campo('dispositivo', 'N° de dispositivo', { inputmode: 'numeric' }) + '</div>' +
-      '<div class="grilla-campos">' + campo('ordenDesde', 'Orden desde', { inputmode: 'numeric' }) + campo('ordenHasta', 'Orden hasta', { inputmode: 'numeric' }) + '</div>' +
+      '<div class="grilla-campos">' + campo('ordenDesde', 'Orden desde', { inputmode: 'numeric', refrescar: true }) + campo('ordenHasta', 'Orden hasta', { inputmode: 'numeric', refrescar: true }) + '</div>' +
+      region('rango', REGIONES.rango()) +
       '<span class="ayuda">Si cada integrante usa un solo celular, el N° de dispositivo queda en 1. Cambia solo si la misma persona carga desde un segundo aparato: ahí va 2 y otro rango de orden, para que no se repitan códigos ni IDs.</span>' +
       campo('encuestador', 'Encuestador/a habitual', { placeholder: 'Nombre o iniciales', ayuda: 'Aparece ya escrito en cada entrevista nueva; ahí se puede cambiar.' }) + campo('puesto', 'Puesto o lugar de relevamiento', { placeholder: 'p. ej. Susques, RN 52' }) + '</section>' +
       '<section class="tarjeta"><h2 class="seccion">Planilla de Google</h2>' +
@@ -857,6 +876,16 @@
     },
     'rec-pausa': function () { Gr.pausar(); },
     'rec-reanudar': function () { Gr.reanudar().catch(function (e) { toast('No se pudo seguir grabando: ' + e.message); }); },
+    'pend-abrir': function (b) {
+      var id = b.dataset.valor; estado.pendAbierto[id] = !estado.pendAbierto[id];
+      if (!estado.pendAbierto[id]) estado.tildadoFinal[id] = [];   // al cerrar, desaparecen las ya tildadas
+      refrescar();
+    },
+    'pend-tilde': function (b) {
+      var eje = b.dataset.campo, i = Number(b.dataset.valor), rec = estado.tildadoFinal[eje] = estado.tildadoFinal[eje] || [];
+      if (rec.indexOf(i) < 0) rec.push(i);
+      ACCIONES['prof-tilde'](b);
+    },
     'prof-abrir': function (b) { var id = b.dataset.valor; estado.profAbierto[id] = !estado.profAbierto[id]; refrescar(); },
     'prof-tilde': function (b) {
       var r = estado.actual, eje = b.dataset.campo, i = Number(b.dataset.valor);
@@ -1086,7 +1115,30 @@
     return html + '</div>';
   }
 
+  /* En «Antes de terminar»: por tema, solo las preguntas que todavía no se tildaron; se tildan ahí mismo. */
+  function cuadroPendientes(e) {
+    var r = estado.actual, t = ((r.entrevista || {}).tildadas || {})[e.id] || [];
+    var faltan = e.preguntas.map(function (q, i) { return { q: q, i: i }; }).filter(function (x) { return t.indexOf(x.i) < 0; });
+    var reciente = (estado.tildadoFinal || {})[e.id] || [];
+    if (!faltan.length && !reciente.length) return '';
+    var abierto = !!estado.pendAbierto[e.id];
+    var html = '<div class="profundizar pendientes"><button type="button" class="prof-cabeza" data-accion="pend-abrir" data-valor="' + e.id + '" aria-expanded="' + abierto + '">' +
+      '<span class="prof-titulo">' + esc(e.titulo) + '</span><span class="prof-cuenta">' + (faltan.length ? 'faltan ' + faltan.length : 'completo') +
+      '<span class="prof-flecha" aria-hidden="true">' + (abierto ? '▲' : '▼') + '</span></span></button>';
+    if (abierto) {
+      // Las que se tildan acá quedan a la vista (tildadas) hasta cerrar el tema, por si hay que destildar
+      var lista = e.preguntas.map(function (q, i) { return { q: q, i: i, on: t.indexOf(i) >= 0 }; })
+        .filter(function (x) { return !x.on || reciente.indexOf(x.i) >= 0; });
+      html += lista.map(function (x) {
+        return '<button type="button" class="prof-fila" aria-pressed="' + x.on + '" data-accion="pend-tilde" data-campo="' + e.id + '" data-valor="' + x.i + '">' +
+          '<span class="prof-caja" aria-hidden="true">' + (x.on ? '✓' : '') + '</span><span>' + esc(x.q) + '</span></button>';
+      }).join('') + '<button type="button" class="btn chico" data-accion="pend-abrir" data-valor="' + e.id + '">Cerrar</button>';
+    }
+    return html + '</div>';
+  }
+
   REGIONES.grab = barraGrabacion;
+  ENT.forEach(function (e) { REGIONES['pend-' + e.id] = function () { return cuadroPendientes(e); }; });
   ENT.forEach(function (e) { REGIONES['prof-' + e.id] = function () { return cuadroProfundizar(e); }; });
 
   function vConsentimiento() {
@@ -1128,9 +1180,9 @@
     var graba = Gr.regId() === r.id && Gr.estado() !== 'inactivo';
     return '<main class="pantalla">' + region('grab', barraGrabacion()) + barra('#/bio/' + r.id + '/3', 'Después de la biológica', 'Antes de terminar', placaChica(r)) +
       bio.map(function (e) { return region('prof-' + e.id, cuadroProfundizar(e)); }).join('') +
-      (pend.length ? '<section class="tarjeta"><h2 class="seccion">Quedaron sin tocar (si da el tiempo)</h2>' + pend.map(function (x) {
-        return '<a class="fila-pendiente" href="#/socio/' + r.id + '/' + (x.e.seccion + 1) + '"><span>' + esc(x.e.titulo) + '</span><b>' + x.faltan + ' ›</b></a>';
-      }).join('') + '</section>' : '') +
+      (pend.length ? '<h2 class="seccion" style="margin:4px 0 0">Quedaron sin tocar (si da el tiempo)</h2>' +
+        '<span class="ayuda" style="margin-top:-8px">Tocá un tema para ver solo las preguntas que faltan y tildalas acá mismo.</span>' +
+        pend.map(function (x) { return region('pend-' + x.e.id, cuadroPendientes(x.e)); }).join('') : '') +
       '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
       '<button type="button" class="btn primario" data-accion="ir-resultados">' + (graba ? '<span class="punto-detener"></span>Detener grabación y ver resultados' : 'Ver resultados') + '</button></div></main>';
   }
