@@ -161,7 +161,7 @@
     return { fila: fila, contacto: contacto };
   }
 
-  /* Columnas de la versión de prueba 1.5: consentimiento detallado, audio y entrevista (sin respuestas: solo qué se trató). */
+  /* Columnas de la app 1.5: consentimiento detallado, audio y entrevista (sin respuestas: solo qué se trató). */
   function entrevistaFila(reg) {
     var c = reg.consent || {}, e = reg.entrevista || {}, a = reg.audio || {}, t = e.tildadas || {};
     var o = {

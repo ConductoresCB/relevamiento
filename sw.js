@@ -10,7 +10,7 @@
  * letra por letra, el navegador no se entera de que hay una versión nueva y sigue usando
  * la app vieja aunque config.js y los demás archivos ya se hayan actualizado.
  */
-// build: 1.5.3-prueba
+// build: 1.5.0
 importScripts('js/config.js');
 var PREFIJO = (self.CONFIG && self.CONFIG.prefijoCache) || 'relevamiento';
 var VERSION = PREFIJO + '-' + ((self.CONFIG && self.CONFIG.versionApp) || '1');
@@ -29,7 +29,7 @@ self.addEventListener('install', function (e) {
 
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (claves) {
-    // Solo borra copias viejas de ESTA app (la principal y la de prueba comparten el sitio)
+    // Solo borra copias viejas de esta app (mismo prefijo, versión distinta)
     return Promise.all(claves.filter(function (k) { return k !== VERSION && k.indexOf(PREFIJO + '-') === 0; })
       .map(function (k) { return caches.delete(k); }));
   }).then(function () { return self.clients.claim(); }));
