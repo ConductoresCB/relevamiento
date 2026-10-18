@@ -19,7 +19,7 @@
   var A_CARGO = ['Ninguna', '1', '2', '3', '4', '5', 'Más de 5'];
 
   var CUESTIONARIO = {
-    version: '2026-10-v3-prueba', // v2 (app 1.4): diastólica; «Ninguna» en 4 y 5; país de la licencia. v3 (prueba 1.5): consentimiento detallado, grabación y entrevista integrada
+    version: '2026-10-v3', // v2 (app 1.4): diastólica; «Ninguna» en 4 y 5; país de la licencia. v3 (app 1.5): consentimiento detallado, grabación y entrevista integrada
     titulo: 'Encuesta sociodemográfica · Conductores de camiones del Corredor Bioceánico - Jujuy',
     secciones: [
       {
@@ -212,7 +212,7 @@
 
   var CONTACTO = ['id', 'participante_id', 'codigo', 'correo', 'celular', 'consentimiento', 'comparte_app', 'fecha'];
 
-  /* ENTREVISTA EN PROFUNDIDAD (versión de prueba 1.5).
+  /* ENTREVISTA EN PROFUNDIDAD (app 1.5).
      Solo las preguntas de la guía de entrevista que NO están en la encuesta (para no repetir lo que ya se preguntó
      de forma cerrada). Cada eje se muestra como un recuadro «Para profundizar» al final de la sección indicada
      (0 = primera sección) — la misma sección donde la encuesta estructurada toca ese tema, para tildarlo mientras

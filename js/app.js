@@ -774,7 +774,7 @@
       '<button type="button" class="btn chico" data-accion="probar">' + ico('senal', 18) + 'Probar conexión</button>' + region('conexion', REGIONES.conexion()) + '</section>' +
       '<section class="tarjeta"><h2 class="seccion">' + esc(T.seccionAdministracion) + '</h2>' +
       '<a class="btn chico" href="#/importar">' + ico('subir', 18) + 'Importar paquetes de otros dispositivos</a>' +
-      '<a class="btn chico" href="../tablero/">' + ico('seguir', 18) + 'Abrir el tablero de análisis</a>' +
+      '<a class="btn chico" href="tablero/">' + ico('seguir', 18) + 'Abrir el tablero de análisis</a>' +
       '<button type="button" class="btn chico" data-accion="respaldo"' + (aj.clave ? '' : ' disabled') + '>' + ico('bajar', 18) + 'Respaldo cifrado de este dispositivo</button>' +
       (estado.instalar ? '<button type="button" class="btn chico azul-claro" data-accion="instalar">Instalar la app</button>' : '') + '</section>' +
       vZonaCuidado() + vBitacora() +
@@ -1070,7 +1070,7 @@
     }
   };
 
-  /* ---------- Consentimiento, grabación y entrevista (versión de prueba 1.5) ---------- */
+  /* ---------- Consentimiento, grabación y entrevista (app 1.5) ---------- */
   function minSeg() { return Gr.reloj(Gr.segundos()); }
 
   function barraGrabacion() {

@@ -1,5 +1,5 @@
 /*
- * grabacion.js — Grabación de audio de la entrevista (versión de prueba 1.5).
+ * grabacion.js — Grabación de audio de la entrevista (app 1.5).
  * Graba con el micrófono del celular (MediaRecorder). Cada 5 segundos guarda un trozo en el celular
  * (IndexedDB): si la app se cierra de golpe, al volver a abrirla se arma el archivo con lo grabado.
  * Al detener, une los trozos en un archivo con el código de la encuesta y la fecha (p. ej. 817-50-4512_2026-10-17.webm).

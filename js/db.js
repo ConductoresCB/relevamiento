@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   var NOMBRE = (window.CONFIG && window.CONFIG.almacen) || 'relevamiento-corredor';
-  var VERSION = 2; // 2 (prueba 1.5): grabaciones de audio
+  var VERSION = 2; // 2 (app 1.5): grabaciones de audio
   var promesa = null;
 
   function abrir() {

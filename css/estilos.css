@@ -196,7 +196,7 @@ details.tarjeta > summary { list-style: revert; }
   .pantalla { padding-top: 32px; }
 }
 
-/* ---------- Versión de prueba 1.5: botones más grandes, grabación y entrevista ---------- */
+/* ---------- App 1.5: botones más grandes, grabación y entrevista ---------- */
 .opciones { gap: 10px; }
 .opcion { min-height: 56px; font-size: 17px; border-width: 2px; border-radius: 12px; }
 .opciones.grilla-2 .opcion, .opciones.grilla-3 .opcion { padding: 6px 10px; line-height: 1.2; }

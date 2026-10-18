@@ -20,16 +20,10 @@
   raiz.CONFIG = {
 
     // Versión de la app. Subila con cada cambio que publiques.
-    versionApp: '1.5.3-prueba',
-
-    // VERSIÓN DE PRUEBA: guarda sus datos y su copia sin señal APARTE de la app principal,
-    // aunque las dos estén en el mismo celular. No cambiar estos nombres.
-    almacen: 'relevamiento-corredor-prueba',
-    prefijoCache: 'prueba-relevamiento',
-    esPrueba: true,
+    versionApp: '1.5.0',
 
     proyecto: {
-      nombre: 'Relevamiento PRUEBA',                 // aparece en la pestaña del navegador
+      nombre: 'Relevamiento',                 // aparece en la pestaña del navegador
       lugar: 'Corredor Bioceánico · Jujuy'    // aparece arriba de "Jornada del…"
     },
 
