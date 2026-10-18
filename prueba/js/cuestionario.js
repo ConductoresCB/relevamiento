@@ -214,11 +214,24 @@
 
   /* ENTREVISTA EN PROFUNDIDAD (versión de prueba 1.5).
      Solo las preguntas de la guía de entrevista que NO están en la encuesta. Cada eje se muestra como un recuadro
-     «Para profundizar» al final de la sección indicada (0 = primera sección); 'final' va en «Antes de terminar».
+     «Para profundizar» al final de la sección indicada (0 = primera sección). El orden de los ejes y a qué sección
+     va cada uno sigue la «Estructura de la entrevista» del equipo (2026-10): Personal → Bioceánico → Salud →
+     Familia → Laboral → Trabajo y salud → Entorno. Como ninguna sección de la encuesta estructurada cubre el
+     corredor bioceánico, y la salud se conversa temprano (según las transcripciones), los dos van en la sección 0,
+     junto con Personal, en ese orden.
      No son preguntas para cargar respuestas: el encuestador tilda las que ya salieron en la charla (queda en la grabación). */
   var ENTREVISTA = [
     { id: 'personal', titulo: 'Personal', seccion: 0, preguntas: [
       '¿Dónde vive actualmente?', '¿Terminó los estudios? Si no, ¿por qué?'] },
+    { id: 'bioceanico', titulo: 'Corredor bioceánico', seccion: 0, preguntas: [
+      '¿Qué conoce del corredor bioceánico? ¿Cómo se enteró?', '¿Qué considera que debería tener el corredor?',
+      '¿Fue consultado respecto al corredor?', '¿Recibió capacitación o asesoramiento? ¿De quién?',
+      '¿Qué cambios le haría al corredor?'] },
+    { id: 'salud', titulo: 'Salud, enfermedad y cuidado', seccion: 0, preguntas: [
+      '¿Qué es para usted estar saludable?', '¿Cuándo diría que alguien está enfermo?',
+      'Cuando tiene un malestar, ¿cómo lo resuelve?', '¿Va al médico o lo resuelve de otra manera?',
+      '¿Zumbidos, palpitaciones, entumecimiento, mareos, visión borrosa, falta de aire?',
+      '¿Qué hierbas o yuyos toma?'] },
     { id: 'familia', titulo: 'Familia', seccion: 1, preguntas: [
       '¿Quiénes conforman su familia?', '¿Cuánto tiempo pasa con la familia?', '¿Qué hace cuando está en familia?',
       '¿Se comunica con su familia durante el viaje?'] },
@@ -232,18 +245,9 @@
       'Paradores: habilitación, estado, seguridad, comida', '¿Duerme en la cabina del camión?',
       '¿Qué come mientras maneja o cuando para?', 'En su casa, ¿come lo mismo que en los viajes?',
       'En los descansos, ¿hace actividad física o estiramientos?', '¿Cuánto tiempo al mes dedica a la recreación?'] },
-    { id: 'salud', titulo: 'Salud, enfermedad y cuidado', seccion: 5, preguntas: [
-      '¿Qué es para usted estar saludable?', '¿Cuándo diría que alguien está enfermo?',
-      'Cuando tiene un malestar, ¿cómo lo resuelve?', '¿Va al médico o lo resuelve de otra manera?',
-      '¿Zumbidos, palpitaciones, entumecimiento, mareos, visión borrosa, falta de aire?',
-      '¿Qué hierbas o yuyos toma?'] },
     { id: 'entorno', titulo: 'Entorno social y consumos', seccion: 6, preguntas: [
       '¿El contacto con otros choferes le sirve de apoyo en el viaje?',
-      'Alcohol: ¿cuándo, qué tipo de bebida y con qué frecuencia?'] },
-    { id: 'bioceanico', titulo: 'Corredor bioceánico', seccion: 'final', preguntas: [
-      '¿Qué conoce del corredor bioceánico? ¿Cómo se enteró?', '¿Qué considera que debería tener el corredor?',
-      '¿Fue consultado respecto al corredor?', '¿Recibió capacitación o asesoramiento? ¿De quién?',
-      '¿Qué cambios le haría al corredor?'] }
+      'Alcohol: ¿cuándo, qué tipo de bebida y con qué frecuencia?'] }
   ];
 
   var COLUMNAS_ENTREVISTA = [

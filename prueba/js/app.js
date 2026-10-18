@@ -1172,14 +1172,11 @@
 
   function vFinal() {
     var r = estado.actual, t = (r.entrevista || {}).tildadas || {};
-    var bio = ENT.filter(function (e) { return e.seccion === 'final'; });
-    bio.forEach(function (e) { if (estado.profAbierto[e.id] === undefined) estado.profAbierto[e.id] = true; });
-    var pend = ENT.filter(function (e) { return e.seccion !== 'final'; }).map(function (e) {
+    var pend = ENT.map(function (e) {
       return { e: e, faltan: e.preguntas.length - (t[e.id] || []).length };
     }).filter(function (x) { return x.faltan > 0; });
     var graba = Gr.regId() === r.id && Gr.estado() !== 'inactivo';
     return '<main class="pantalla">' + region('grab', barraGrabacion()) + barra('#/bio/' + r.id + '/3', 'Después de la biológica', 'Antes de terminar', placaChica(r)) +
-      bio.map(function (e) { return region('prof-' + e.id, cuadroProfundizar(e)); }).join('') +
       (pend.length ? '<h2 class="seccion" style="margin:4px 0 0">Quedaron sin tocar (si da el tiempo)</h2>' +
         '<span class="ayuda" style="margin-top:-8px">Tocá un tema para ver solo las preguntas que faltan y tildalas acá mismo.</span>' +
         pend.map(function (x) { return region('pend-' + x.e.id, cuadroPendientes(x.e)); }).join('') : '') +
@@ -1201,9 +1198,9 @@
           (a.copiado ? '<span class="estado sinc">' + ico('check', 16) + 'Copiado a la PC</span>' : '<span class="estado pend"><span class="punto-pendiente"></span>Solo en el celular</span>') +
           '</span></div>';
       }).join('') + '</div>' : '<div class="vacio">Todavía no hay grabaciones.</div>') +
-      '<span class="ayuda">Cada audio lleva el código de su encuesta. Pasalos a la computadora del equipo (por cable o compartiendo) y confirmá cuando estén copiados.</span>' +
+      '<span class="ayuda">Cada audio lleva el código de su encuesta. Al tocar «Pasar» se abre para compartirlo (Drive, correo, WhatsApp) o se guarda en este dispositivo; desde ahí pasalo a la computadora del equipo y confirmá acá cuando ya esté copiado.</span>' +
       '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
-      '<button type="button" class="btn primario" data-accion="audios-pasar"' + (sinCopiar.length ? '' : ' disabled') + '>' + ico('bajar', 22) + 'Pasar ' + sinCopiar.length + (sinCopiar.length === 1 ? ' audio' : ' audios') + ' a la computadora</button>' +
+      '<button type="button" class="btn primario" data-accion="audios-pasar"' + (sinCopiar.length ? '' : ' disabled') + '>' + ico('bajar', 22) + 'Pasar ' + sinCopiar.length + (sinCopiar.length === 1 ? ' audio' : ' audios') + '</button>' +
       '<button type="button" class="btn" data-accion="audios-liberar"' + (copiados ? '' : ' disabled') + '>Liberar espacio (borrar ' + copiados + (copiados === 1 ? ' ya copiado' : ' ya copiados') + ')</button>' +
       '<a class="btn azul-claro" href="#/jornada">Volver a la jornada</a></div></main>';
   }
