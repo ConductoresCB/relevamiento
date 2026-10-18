@@ -41,7 +41,10 @@
 
   var estado = { ajustes: null, registros: [], actual: null, ruta: { vista: 'jornada' }, buscar: '', verTodos: false,
     instalar: null, sincronizando: false, mensajeSync: '', mensajeConexion: '', importacion: [],
-    online: navigator.onLine, persistente: null, bitacora: [] };
+    online: navigator.onLine, persistente: null, bitacora: [], audios: [], profAbierto: {}, pendAbierto: {}, tildadoFinal: {} };
+  var Gr = window.Grabacion;
+  var ENT = I.ENTREVISTA || [];
+  var esPrueba = !!CFG.esPrueba;
 
   /* Definiciones indexadas por id (para detalles y opciones exclusivas) */
   var DEF = {};
@@ -144,6 +147,7 @@
     if (typeof valor === 'boolean') obj[clave] = valor;
     else if (vacio) delete obj[clave];
     else obj[clave] = valor;
+    if (grupo === 'consent' && clave === 'participa') reg.consentimiento = valor === 'Sí';
     if (grupo === 'reg' && (clave === 'orden' || clave === 'edad' || clave === 'cp')) {
       reg.codigo = R.codigo(reg.orden, reg.edad, reg.cp);
       // El ID interno sale del N° de orden: si se corrige el orden, se corrige el ID.
@@ -170,14 +174,14 @@
     var r = ruta();
     return guardarActual().then(function () {
       estado.ruta = r;
-      var conId = ['participante', 'socio', 'bio', 'resultados'].indexOf(r.vista) >= 0;
+      var conId = ['consentimiento', 'participante', 'socio', 'bio', 'final', 'resultados'].indexOf(r.vista) >= 0;
       if (!conId) { estado.actual = null; render(true); return; }
-      if (estado.actual && estado.actual.id === r.id) { render(true); return; }
+      if (estado.actual && estado.actual.id === r.id) { marcarParte(); render(true); return; }
       var enMemoria = estado.registros.find(function (x) { return x.id === r.id; });
-      if (enMemoria) { estado.actual = enMemoria; render(true); return; }
+      if (enMemoria) { estado.actual = enMemoria; marcarParte(); render(true); return; }
       return DB.obtener(r.id).then(function (reg) {
         if (!reg) { ir('#/jornada'); return; }
-        estado.actual = reg; render(true);
+        estado.actual = reg; marcarParte(); render(true);
       });
     });
   }
@@ -199,7 +203,10 @@
   function render(nuevaPantalla) {
     var foco = nuevaPantalla ? null : claveFoco();
     var v = estado.ruta.vista, html;
-    if (v === 'participante') html = vParticipante();
+    if (v === 'consentimiento') html = vConsentimiento();
+    else if (v === 'final') html = vFinal();
+    else if (v === 'audios') html = vAudios();
+    else if (v === 'participante') html = vParticipante();
     else if (v === 'socio') html = vSocio();
     else if (v === 'bio') html = vBio();
     else if (v === 'resultados') html = vResultados();
@@ -259,10 +266,12 @@
     var conMarca = true;
     if (disposicion === 'linea' || disposicion === 'grilla') {
       conMarca = false;
-      // 7 opciones con una primera distinta («Ninguna»): esa va sola arriba y las otras 6 en una grilla pareja de 3 × 2
-      var primeraSola = opciones.length === 7 && isNaN(Number(opciones[0]));
-      clase += opciones.length === 2 ? ' grilla-2' : opciones.length === 3 || opciones.length === 6 ? ' grilla-3'
-        : primeraSola ? ' grilla-3 primera-sola' : ' en-linea';
+      // Botones grandes y del mismo ancho: «Ninguna…» ocupa toda la fila; opciones cortas en 3 columnas, largas en 2
+      var primeraSola = /^Ninguna/.test(opciones[0]) && opciones.length > 3;
+      var resto = primeraSola ? opciones.slice(1) : opciones;
+      var largo = Math.max.apply(null, resto.map(function (o) { return String(o).length; }));
+      var cols = resto.length === 2 || resto.length === 4 || largo > 10 ? 2 : 3;
+      clase += ' grilla-' + cols + (primeraSola ? ' primera-sola' : '') + (!primeraSola && cols === 2 && resto.length % 2 ? ' ultima-sola' : '');
     }
     return '<div class="' + clase + '">' + opciones.map(function (o) {
       return botonOpcion(ruta, o, sel.indexOf(o) >= 0, multiple, conMarca);
@@ -314,6 +323,7 @@
     p += '<span class="pildora' + (ab.completo ? ' hecha' : '') + '">Bio</span>';
     if (ab.glucemiaRechazada) p += '<span class="pildora rechazada">Sin glucemia</span>';
     else p += '<span class="pildora' + (ab.glucemia ? ' hecha' : '') + '">Glucemia</span>';
+    if (r.audio && r.audio.archivos && r.audio.archivos.length) p += '<span class="pildora hecha">Audio</span>';
     return '<div class="pildoras">' + p + '</div>';
   }
 
@@ -324,12 +334,13 @@
     var falta = !aj.encuestador || !aj.url || !aj.clave;
     var html = '<main class="pantalla">' +
       '<div class="cabecera"><div style="display:flex;flex-direction:column;gap:2px"><span class="ceja">' + esc(PROYECTO.lugar) + '</span>' +
-      '<h1 class="titulo grande">' + esc(T.jornada) + ' ' + fechaCorta(f) + '</h1></div>' +
+      '<h1 class="titulo grande">' + esc(T.jornada) + ' ' + fechaCorta(f) + '</h1>' + (esPrueba ? '<span class="etiqueta-prueba">Versión de prueba</span>' : '') + '</div>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
       (estado.online ? '<span class="chip-red con">' + ico('senal', 18) + esc(T.conSenal) + '</span>' : '<span class="chip-red sin">' + ico('sinSenal', 18) + esc(T.sinSenal) + '</span>') +
       '<a class="icono-btn" href="#/ajustes" aria-label="Ajustes del dispositivo">' + ico('ajustes', 20) + '</a></div></div>' +
       '<div class="linea-dispositivo">' + ico('celu', 18) + '<span>Equipo ' + esc(aj.equipo) + ' · Dispositivo ' + esc(aj.dispositivo) +
-      ' · códigos ' + R.pad(aj.ordenDesde, 3) + '–' + R.pad(aj.ordenHasta, 3) + (aj.puesto ? ' · ' + esc(aj.puesto) : '') + (aj.encuestador ? ' · ' + esc(aj.encuestador) : '') + '</span></div>';
+      ' · códigos ' + R.pad(aj.ordenDesde, 3) + '–' + R.pad(aj.ordenHasta, 3) + (aj.puesto ? ' · ' + esc(aj.puesto) : '') + (aj.encuestador ? ' · ' + esc(aj.encuestador) : '') + '</span></div>' +
+      (errorRango(aj) ? '<a class="error-linea" href="#/ajustes">' + ico('alerta', 18) + 'Revisá el rango de orden en Ajustes: ' + esc(errorRango(aj)) + '</a>' : '');
 
     if (falta) {
       html += '<div class="tarjeta aviso"><p><b>Falta configurar este dispositivo.</b> Cargá encuestador/a, equipo, la dirección de la planilla y la clave del equipo para poder enviar y generar paquetes.</p>' +
@@ -376,8 +387,23 @@
   }
 
   /* ---------- Participante ---------- */
+  /* El N° de orden es la primera parte del código (3 cifras): el rango de cada dispositivo tiene que caber en 1–999. */
+  function errorRango(aj) {
+    var d = num(aj.ordenDesde), h = num(aj.ordenHasta);
+    if (d === null || h === null) return 'Completá «Orden desde» y «Orden hasta».';
+    if (d < 1 || h > 999 || d % 1 || h % 1) return 'El N° de orden tiene 3 cifras: el rango tiene que estar entre 1 y 999 (por ejemplo, de 200 a 399).';
+    if (d > h) return '«Orden desde» tiene que ser menor que «Orden hasta».';
+    return '';
+  }
+  REGIONES.rango = function () {
+    var e = errorRango(estado.ajustes);
+    return e ? '<span class="error-linea">' + ico('alerta', 18) + esc(e) + '</span>' : '';
+  };
+
   function siguienteOrden() {
-    var aj = estado.ajustes, d = Number(aj.ordenDesde) || 1, h = Number(aj.ordenHasta) || 999;
+    var aj = estado.ajustes;
+    if (errorRango(aj)) return '';   // con el rango mal cargado no se sugiere nada: se escribe a mano o se corrige en Ajustes
+    var d = Number(aj.ordenDesde), h = Number(aj.ordenHasta);
     var usados = estado.registros.filter(function (r) {
       return r.equipo === aj.equipo && String(r.dispositivo) === String(aj.dispositivo);
     }).map(function (r) { return Number(r.orden); }).filter(function (n) { return n >= d && n <= h; });
@@ -396,7 +422,8 @@
   function erroresIdentificacion(r) {
     var e = [];
     var o = num(r.orden), ed = num(r.edad), rep = ordenRepetido(r);
-    if (o === null || o < 1 || o > 999 || o % 1) e.push('El número de orden debe ser de 1 a 999.');
+    if (o === null) e.push('Falta el N° de orden.');
+    else if (o < 1 || o > 999 || o % 1) e.push('El N° de orden tiene 3 cifras (de 1 a 999). Si el rango de Ajustes empieza en 1000 o más, corregilo ahí.');
     if (rep) e.push('El N° de orden ' + o + ' ya se usó en este dispositivo (código ' + (rep.codigo || 'sin completar') + ').');
     if (ed === null || ed < RANGOS.edad[0] || ed > RANGOS.edad[1] || ed % 1) e.push('La edad debe ser un número entero entre ' + RANGOS.edad[0] + ' y ' + RANGOS.edad[1] + '.');
     if (!/^\d{4}$/.test(String(r.cp || ''))) e.push('El código postal debe tener 4 dígitos.');
@@ -407,9 +434,10 @@
 
   REGIONES.codigo = function () {
     var r = estado.actual; if (!r) return '';
-    var rep = ordenRepetido(r);
+    var rep = ordenRepetido(r), o = num(r.orden), fuera = o !== null && (o < 1 || o > 999 || o % 1);
     return '<div class="placa"><span class="valor">' + esc(r.codigo || '___-__-____') + '</span><span class="partes">orden · edad · código postal</span></div>' +
-      (rep ? '<span class="error-linea">' + ico('alerta', 18) + 'Ese N° de orden ya se usó en este dispositivo (código ' + esc(rep.codigo || 'sin completar') + ')</span>'
+      (fuera ? '<span class="error-linea">' + ico('alerta', 18) + 'El N° de orden tiene 3 cifras: va de 1 a 999</span>'
+        : rep ? '<span class="error-linea">' + ico('alerta', 18) + 'Ese N° de orden ya se usó en este dispositivo (código ' + esc(rep.codigo || 'sin completar') + ')</span>'
         : r.codigo ? '<span class="ok-linea">' + ico('check', 18) + 'Código libre en este dispositivo</span>' : '<span class="ayuda">Completá orden, edad y código postal.</span>');
   };
 
@@ -427,7 +455,7 @@
   function vParticipante() {
     var r = estado.actual, aj = estado.ajustes;
     var nuevo = !r.codigo && !r.modificado;
-    var html = '<main class="pantalla">' + barra('#/jornada', 'Paso 1 de 4', nuevo ? T.nuevoParticipante : T.identificacion) +
+    var html = '<main class="pantalla">' + region('grab', barraGrabacion()) + barra('#/consentimiento/' + esc(r.id), 'Paso 1 de 4', nuevo ? T.nuevoParticipante : T.identificacion) +
       pasosRelevamiento(r, 0) +
       '<section style="display:flex;flex-direction:column;gap:8px"><h2 class="seccion">' + esc(T.codigoIdentificacion) + '</h2>' +
       '<div class="grilla-campos tres">' +
@@ -445,8 +473,10 @@
       campoTexto('contacto.correo', 'Correo electrónico', (r.contacto || {}).correo, { tipo: 'email', placeholder: 'nombre@correo.com', autocomplete: 'off' }) +
       campoTexto('contacto.celular', 'Celular', (r.contacto || {}).celular, { tipo: 'tel', placeholder: '+54 9 388 …', inputmode: 'tel' }) + '</section>';
 
-    html += '<div class="casilla-linea"><input type="checkbox" id="consentimiento" data-campo="reg.consentimiento"' + (r.consentimiento ? ' checked' : '') + '>' +
-      '<label for="consentimiento">' + esc(T.consentimiento) + '</label></div>' +
+    var cs = r.consent || {};
+    html += '<a class="tarjeta" href="#/consentimiento/' + esc(r.id) + '" style="text-decoration:none;color:inherit;gap:4px">' +
+      '<span class="seccion">Consentimiento</span><span>' + (r.consentimiento ? 'Participa' : '<b style="color:var(--error)">Falta el consentimiento</b>') +
+      ' · punción: ' + esc(cs.puncion || '—') + ' · grabación: ' + esc(cs.grabacion || '—') + '</span><span class="ayuda">Tocá para revisarlo</span></a>' +
       '<div class="casilla-linea"><input type="checkbox" id="comparte" data-campo="reg.comparte_app"' + (r.comparte_app ? ' checked' : '') + '>' +
       '<label for="comparte">' + esc(T.comparteApp) + '</label></div>';
 
@@ -508,9 +538,10 @@
     var resp = r.socio || {};
     var anterior = n === 1 ? '#/participante/' + r.id : '#/socio/' + r.id + '/' + (n - 1);
     var siguiente = n === SECC.length ? '#/bio/' + r.id + '/1' : '#/socio/' + r.id + '/' + (n + 1);
-    return '<main class="pantalla">' + barra(anterior, T.cejaSocio, s.titulo) +
+    return '<main class="pantalla">' + region('grab', barraGrabacion()) + barra(anterior, T.cejaSocio, s.titulo) +
       '<div style="display:flex;flex-direction:column;gap:6px">' + region('progresoSocio', REGIONES.progresoSocio()) + '</div>' +
       s.preguntas.map(function (p) { return vPregunta(p, resp); }).join('') +
+      ENT.filter(function (e) { return e.seccion === n - 1; }).map(function (e) { return region('prof-' + e.id, cuadroProfundizar(e)); }).join('') +
       '<div class="pie-fijo empujar-abajo"><div class="fila-botones"><a class="btn" href="' + anterior + '">Anterior</a>' +
       '<a class="btn primario" style="min-height:52px;font-size:17px" href="' + siguiente + '">' + (n === SECC.length ? esc(T.irABio) : 'Siguiente') + ico('seguir', 22) + '</a></div></div></main>';
   }
@@ -554,9 +585,9 @@
     if (fr.aplica === false) { linea1 = 'FINDRISK no corresponde'; linea2 = fr.motivo; }
     else if (fr.completo) { linea1 = 'FINDRISK <b>' + fr.puntos + ' pts</b>'; linea2 = fr.categoria + ' · ' + fr.probabilidad; }
     else { linea1 = 'FINDRISK parcial <b>' + fr.puntos + ' pts</b>'; linea2 = 'Faltan ' + fr.faltan.length + ' ítems del test'; }
-    var siguiente = n < 3 ? '#/bio/' + r.id + '/' + (n + 1) : '#/resultados/' + r.id;
+    var siguiente = n < 3 ? '#/bio/' + r.id + '/' + (n + 1) : '#/final/' + r.id;
     return '<div class="fila-pie"><div class="resumen-pie"><span>' + linea1 + '</span><span style="color:var(--tinta-2)">' + esc(linea2) + '</span></div>' +
-      '<a class="btn primario" style="min-height:56px;font-size:17px;padding:0 22px;flex:none" href="' + siguiente + '">' + (n < 3 ? 'Siguiente' : esc(T.verResultados)) + ico('seguir', 22) + '</a></div>';
+      '<a class="btn primario" style="min-height:56px;font-size:17px;padding:0 22px;flex:none" href="' + siguiente + '">' + (n < 3 ? 'Siguiente' : 'Antes de terminar') + ico('seguir', 22) + '</a></div>';
   };
 
   REGIONES.ayuno = function () {
@@ -569,7 +600,7 @@
     var r = estado.actual, n = Math.min(Math.max(estado.ruta.n || 1, 1), 3), b = r.bio || {};
     estado.ruta.n = n;
     var volver = n === 1 ? '#/socio/' + r.id + '/' + SECC.length : '#/bio/' + r.id + '/' + (n - 1);
-    var html = '<main class="pantalla">' + barra(volver, T.cejaBio, PASOS_BIO[n - 1], placaChica(r)) +
+    var html = '<main class="pantalla">' + region('grab', barraGrabacion()) + barra(volver, T.cejaBio, PASOS_BIO[n - 1], placaChica(r)) +
       '<nav class="pasos" aria-label="Partes del módulo biológico" style="grid-template-columns:repeat(3,minmax(0,1fr))">' + PASOS_BIO.map(function (t, i) {
         return '<a class="paso ' + (i + 1 === n ? 'actual' : i + 1 < n ? 'hecho' : '') + '" href="#/bio/' + r.id + '/' + (i + 1) + '" style="text-decoration:none"><span class="barrita"></span>' + t + '</a>';
       }).join('') + '</nav>';
@@ -594,6 +625,7 @@
         preguntaBio('b_antec_fam_dbt', null, '<span class="ayuda">Primer grado: padres, hermanos.</span>') + preguntaBio('b_fuma', 'grilla') +
         region('calcBio', REGIONES.calcBio());
     } else {
+      if ((r.consent || {}).puncion === 'No') html += '<p class="tarjeta aviso" style="margin:0">En el consentimiento <b>no aceptó la punción</b>: marcá «No».</p>';
       html += preguntaBio('g_acepta', 'grilla');
       if (b.g_acepta === 'Sí') {
         html += '<div class="grilla-campos">' +
@@ -623,7 +655,9 @@
 
   function vResultados() {
     var r = estado.actual, b = r.bio || {}, c = R.calcular(r), fr = c.findrisk, fh = c.framingham;
-    var html = '<main class="pantalla">' + barra('#/bio/' + r.id + '/3', T.cejaResultados, T.resultados, placaChica(r)) + pasosRelevamiento(r, 3);
+    var html = '<main class="pantalla">' + barra('#/final/' + r.id, T.cejaResultados, T.resultados, placaChica(r)) + pasosRelevamiento(r, 3);
+    var au = r.audio || {};
+    if (au.archivos && au.archivos.length) html += '<span class="ok-linea">' + ico('check', 18) + 'Audio guardado · ' + Math.max(1, Math.round((au.segundos || 0) / 60)) + ' min · ' + esc(au.archivos.join(', ')) + '</span>';
 
     html += '<section class="tarjeta"><h2 class="seccion">FINDRISK · riesgo de diabetes a 10 años</h2>';
     if (fr.aplica === false) html += '<p>No corresponde: ' + esc(fr.motivo) + '.</p>';
@@ -716,7 +750,8 @@
       (aj.ultimaHuella ? '<p class="ayuda" style="margin:0">Último paquete: ' + fechaCorta(aj.ultimoPaquete) + ' ' + horaDe(aj.ultimoPaquete) + ' · huella <b class="mono">' + esc(aj.ultimaHuella) + '</b></p>' : '') +
       '<p class="ayuda" style="margin:0">El paquete es una copia para transportar: no libera el celular. Lo que no se envió a la planilla queda guardado acá.</p></section>' +
       '<span class="ayuda empujar-abajo" style="text-align:center">' +
-      (aj.ultimaSync ? 'Última sincronización: ' + fechaCorta(aj.ultimaSync) + ' ' + horaDe(aj.ultimaSync) : 'Este dispositivo todavía no sincronizó') + '</span></main>';
+      (aj.ultimaSync ? 'Última sincronización: ' + fechaCorta(aj.ultimaSync) + ' ' + horaDe(aj.ultimaSync) : 'Este dispositivo todavía no sincronizó') + '</span>' +
+      '<a class="btn primario" href="#/audios" style="justify-content:space-between"><span style="display:flex;align-items:center;gap:10px"><span class="punto-grabando"></span>Audios del día (' + estado.audios.length + ')</span>' + ico('seguir', 22) + '</a></main>';
     return html;
   }
 
@@ -729,7 +764,8 @@
     return '<main class="pantalla">' + barra('#/jornada', 'Este dispositivo', 'Ajustes') +
       '<section class="tarjeta"><h2 class="seccion">Equipo y dispositivo</h2>' +
       '<div class="grilla-campos">' + campo('equipo', 'Equipo', { placeholder: 'A' }) + campo('dispositivo', 'N° de dispositivo', { inputmode: 'numeric' }) + '</div>' +
-      '<div class="grilla-campos">' + campo('ordenDesde', 'Orden desde', { inputmode: 'numeric' }) + campo('ordenHasta', 'Orden hasta', { inputmode: 'numeric' }) + '</div>' +
+      '<div class="grilla-campos">' + campo('ordenDesde', 'Orden desde', { inputmode: 'numeric', refrescar: true }) + campo('ordenHasta', 'Orden hasta', { inputmode: 'numeric', refrescar: true }) + '</div>' +
+      region('rango', REGIONES.rango()) +
       '<span class="ayuda">Si cada integrante usa un solo celular, el N° de dispositivo queda en 1. Cambia solo si la misma persona carga desde un segundo aparato: ahí va 2 y otro rango de orden, para que no se repitan códigos ni IDs.</span>' +
       campo('encuestador', 'Encuestador/a habitual', { placeholder: 'Nombre o iniciales', ayuda: 'Aparece ya escrito en cada entrevista nueva; ahí se puede cambiar.' }) + campo('puesto', 'Puesto o lugar de relevamiento', { placeholder: 'p. ej. Susques, RN 52' }) + '</section>' +
       '<section class="tarjeta"><h2 class="seccion">Planilla de Google</h2>' +
@@ -738,7 +774,7 @@
       '<button type="button" class="btn chico" data-accion="probar">' + ico('senal', 18) + 'Probar conexión</button>' + region('conexion', REGIONES.conexion()) + '</section>' +
       '<section class="tarjeta"><h2 class="seccion">' + esc(T.seccionAdministracion) + '</h2>' +
       '<a class="btn chico" href="#/importar">' + ico('subir', 18) + 'Importar paquetes de otros dispositivos</a>' +
-      '<a class="btn chico" href="tablero/">' + ico('seguir', 18) + 'Abrir el tablero de análisis</a>' +
+      '<a class="btn chico" href="../tablero/">' + ico('seguir', 18) + 'Abrir el tablero de análisis</a>' +
       '<button type="button" class="btn chico" data-accion="respaldo"' + (aj.clave ? '' : ' disabled') + '>' + ico('bajar', 18) + 'Respaldo cifrado de este dispositivo</button>' +
       (estado.instalar ? '<button type="button" class="btn chico azul-claro" data-accion="instalar">Instalar la app</button>' : '') + '</section>' +
       vZonaCuidado() + vBitacora() +
@@ -794,7 +830,7 @@
         contacto: {}, socio: {}, bio: {}, estado: 'borrador', creado: ahoraISO(), modificado: null, sincronizado: null,
         version_instrumento: I.CUESTIONARIO.version };
       estado.actual = r;
-      ir('#/participante/' + r.id);
+      ir('#/consentimiento/' + r.id);
     },
     'ver-todos': function () { estado.verTodos = !estado.verTodos; refrescar(); },
     'opcion': function (b) {
@@ -817,8 +853,90 @@
         previos.forEach(function (op) { if (sel.indexOf(op) < 0 && def.detalles[op]) asignar(grupo + '.' + def.detalles[op].id, ''); });
       }
       if (ruta === 'bio.g_acepta' && nuevo === 'Sí' && !valor('bio.g_hora_medicion')) asignar('bio.g_hora_medicion', horaAhora());
+      // País de nacimiento de habla hispana: se tilda solo «Español» en entiende/habla (no hace falta preguntarlo).
+      // Solo agrega: si ya se desmarcó a mano, o el país es otro, no se toca.
+      if (ruta === 'socio.p01_nac_pais' && ['Argentina', 'Chile', 'Paraguay'].indexOf(nuevo) >= 0) {
+        ['p06_idiomas_entiende', 'p07_idiomas_habla'].forEach(function (campo) {
+          var actuales = valor('socio.' + campo), lista = Array.isArray(actuales) ? actuales.slice() : [];
+          if (lista.indexOf('Español') < 0) { lista.push('Español'); asignar('socio.' + campo, lista); }
+        });
+      }
       asignar(ruta, nuevo);
       render();
+    },
+    'consent-seguir': function () {
+      var r = estado.actual, c = r.consent || {};
+      if (c.participa !== 'Sí' || !c.puncion || !c.grabacion) return;
+      asignar('reg.consentimiento', true);
+      var nombre = nombreAudio(r);
+      var graba = c.grabacion === 'Sí' && Gr.soportado() && !(Gr.regId() === r.id && Gr.estado() !== 'inactivo');
+      (graba ? Gr.iniciar(r.id, nombre).then(function () { anotar('Grabación iniciada', ''); }, function (e) {
+        toast('No se pudo empezar a grabar: ' + (e && e.message || 'sin permiso para el micrófono') + '. Usá la grabadora del celular.');
+      }) : Promise.resolve()).then(function () { guardarActual(); ir('#/participante/' + r.id); });
+    },
+    'descartar': function () {
+      var r = estado.actual;
+      clearTimeout(reloj);
+      (r && r.modificado ? DB.borrar(r.id) : Promise.resolve()).then(function () {
+        estado.registros = estado.registros.filter(function (x) { return !r || x.id !== r.id; });
+        estado.actual = null; ir('#/jornada');
+      });
+    },
+    'rec-pausa': function () { Gr.pausar(); },
+    'rec-reanudar': function () { Gr.reanudar().catch(function (e) { toast('No se pudo seguir grabando: ' + e.message); }); },
+    'pend-abrir': function (b) {
+      var id = b.dataset.valor; estado.pendAbierto[id] = !estado.pendAbierto[id];
+      if (!estado.pendAbierto[id]) estado.tildadoFinal[id] = [];   // al cerrar, desaparecen las ya tildadas
+      refrescar();
+    },
+    'pend-tilde': function (b) {
+      var eje = b.dataset.campo, i = Number(b.dataset.valor), rec = estado.tildadoFinal[eje] = estado.tildadoFinal[eje] || [];
+      if (rec.indexOf(i) < 0) rec.push(i);
+      ACCIONES['prof-tilde'](b);
+    },
+    'prof-abrir': function (b) { var id = b.dataset.valor; estado.profAbierto[id] = !estado.profAbierto[id]; refrescar(); },
+    'prof-tilde': function (b) {
+      var r = estado.actual, eje = b.dataset.campo, i = Number(b.dataset.valor);
+      r.entrevista = r.entrevista || {}; r.entrevista.tildadas = r.entrevista.tildadas || {};
+      var l = (r.entrevista.tildadas[eje] || []).slice(), k = l.indexOf(i);
+      if (k >= 0) l.splice(k, 1); else l.push(i);
+      r.entrevista.tildadas[eje] = l.sort(function (a, c) { return a - c; });
+      tocar(); refrescar();
+    },
+    'ir-resultados': function () {
+      var r = estado.actual;
+      (Gr.regId() === r.id && Gr.estado() !== 'inactivo' ? detenerGrabacion(r).then(function () { toast('Audio guardado'); }) : Promise.resolve())
+        .then(function () { ir('#/resultados/' + r.id); });
+    },
+    'audios-pasar': function () {
+      var lista = estado.audios.filter(function (a) { return !a.copiado; });
+      if (!lista.length) return;
+      var archivos = lista.map(function (a) { return new File([a.blob], a.nombre, { type: a.mime || 'audio/webm' }); });
+      var compartir = navigator.canShare && navigator.canShare({ files: archivos })
+        ? navigator.share({ files: archivos, title: 'Audios del relevamiento' }).then(function () { return true; }, function (e) { if (e && e.name === 'AbortError') return false; throw e; })
+        : Promise.reject(new Error('sin compartir'));
+      compartir.catch(function () {
+        lista.forEach(function (a, i) { setTimeout(function () { S.descargar(a.nombre, a.blob, a.mime || 'audio/webm'); }, i * 400); });
+        return true;
+      }).then(function (hecho) {
+        if (!hecho) return;
+        setTimeout(function () {
+          if (!window.confirm('¿Quedaron los ' + lista.length + ' audios copiados en la computadora del equipo?\n\nSi respondés que sí, se marcan como copiados (todavía no se borran).')) return;
+          Promise.all(lista.map(function (a) { a.copiado = true; return DB.guardarAudio(a); })).then(function () {
+            anotar('Audios copiados a la PC', lista.length + ' archivos');
+            return cargarAudios();
+          }).then(function () { render(); });
+        }, 600);
+      });
+    },
+    'audios-liberar': function () {
+      var lista = estado.audios.filter(function (a) { return a.copiado; });
+      if (!lista.length) return;
+      if (!window.confirm('Se borran de este celular ' + lista.length + ' audios que ya están copiados en la computadora. ¿Seguir?')) return;
+      Promise.all(lista.map(function (a) { return DB.borrarAudio(a.nombre); })).then(function () {
+        anotar('Audios borrados del celular', lista.length + ' ya copiados');
+        return cargarAudios();
+      }).then(function () { toast('Espacio liberado'); render(); });
     },
     'continuar': function (b) {
       var r = estado.actual, errores = erroresIdentificacion(r);
@@ -847,7 +965,7 @@
     'finalizar': function () {
       var r = estado.actual;
       r.estado = 'finalizado'; r.hora_fin = horaAhora(); tocar();
-      guardarActual().then(function () {
+      (Gr.regId() === r.id ? detenerGrabacion(r) : Promise.resolve()).then(guardarActual).then(function () {
         anotar('Relevamiento finalizado', r.participante_id || '');
         toast('Relevamiento ' + (r.codigo || '') + ' guardado'); ir('#/jornada');
       });
@@ -952,6 +1070,167 @@
     }
   };
 
+  /* ---------- Consentimiento, grabación y entrevista (versión de prueba 1.5) ---------- */
+  function minSeg() { return Gr.reloj(Gr.segundos()); }
+
+  function barraGrabacion() {
+    var r = estado.actual;
+    if (!r || Gr.regId() !== r.id) return '';
+    var st = Gr.estado();
+    if (st === 'cortado') {
+      return '<div class="barra-grabacion cortada" role="alert"><span>La grabación se cortó</span>' +
+        '<button type="button" class="btn chico" data-accion="rec-reanudar">Seguir grabando</button></div>';
+    }
+    return '<div class="barra-grabacion' + (st === 'pausado' ? ' pausada' : '') + '" role="status"><span class="punto-grabando"></span>' +
+      '<span style="flex:1">' + (st === 'pausado' ? 'En pausa · ' : 'Grabando · ') + '<span class="mono" id="rec-tiempo">' + minSeg() + '</span></span>' +
+      '<button type="button" class="btn chico" data-accion="' + (st === 'pausado' ? 'rec-reanudar' : 'rec-pausa') + '">' + (st === 'pausado' ? 'Seguir' : 'Pausa') + '</button></div>';
+  }
+  setInterval(function () { var el = document.getElementById('rec-tiempo'); if (el && Gr.estado() === 'grabando') el.textContent = minSeg(); }, 1000);
+  Gr.alCambiar(function () { refrescar(); });
+
+  /* Anota en qué minuto de la grabación empieza cada parte (para encontrarla al transcribir). */
+  function nombreParte(rt) {
+    if (rt.vista === 'participante') return 'Identificación';
+    if (rt.vista === 'socio') return 'Socio ' + rt.n + ' ' + (SECC[rt.n - 1] ? SECC[rt.n - 1].titulo : '');
+    if (rt.vista === 'bio') return 'Biológica ' + rt.n;
+    if (rt.vista === 'final') return 'Antes de terminar';
+    return '';
+  }
+  function marcarParte() {
+    var r = estado.actual, rt = estado.ruta;
+    if (!r || Gr.regId() !== r.id || Gr.estado() === 'inactivo') return;
+    var parte = nombreParte(rt);
+    if (!parte) return;
+    r.entrevista = r.entrevista || {};
+    var m = r.entrevista.marcas = r.entrevista.marcas || [];
+    if (m.some(function (x) { return x.parte === parte; })) return;
+    m.push({ parte: parte, t: minSeg() });
+    tocar();
+  }
+
+  function cuadroProfundizar(e) {
+    var r = estado.actual, t = ((r.entrevista || {}).tildadas || {})[e.id] || [], abierto = !!estado.profAbierto[e.id];
+    var html = '<div class="profundizar"><button type="button" class="prof-cabeza" data-accion="prof-abrir" data-valor="' + e.id + '" aria-expanded="' + abierto + '">' +
+      '<span class="prof-titulo">Para profundizar · ' + esc(e.titulo) + '</span><span class="prof-cuenta">' + t.length + ' de ' + e.preguntas.length +
+      '<span class="prof-flecha" aria-hidden="true">' + (abierto ? '▲' : '▼') + '</span></span></button>';
+    if (abierto) {
+      html += e.preguntas.map(function (q, i) {
+        var on = t.indexOf(i) >= 0;
+        return '<button type="button" class="prof-fila" aria-pressed="' + on + '" data-accion="prof-tilde" data-campo="' + e.id + '" data-valor="' + i + '">' +
+          '<span class="prof-caja" aria-hidden="true">' + (on ? '✓' : '') + '</span><span>' + esc(q) + '</span></button>';
+      }).join('') + '<button type="button" class="btn chico" data-accion="prof-abrir" data-valor="' + e.id + '">Cerrar</button>';
+    }
+    return html + '</div>';
+  }
+
+  /* En «Antes de terminar»: por tema, solo las preguntas que todavía no se tildaron; se tildan ahí mismo. */
+  function cuadroPendientes(e) {
+    var r = estado.actual, t = ((r.entrevista || {}).tildadas || {})[e.id] || [];
+    var faltan = e.preguntas.map(function (q, i) { return { q: q, i: i }; }).filter(function (x) { return t.indexOf(x.i) < 0; });
+    var reciente = (estado.tildadoFinal || {})[e.id] || [];
+    if (!faltan.length && !reciente.length) return '';
+    var abierto = !!estado.pendAbierto[e.id];
+    var html = '<div class="profundizar pendientes"><button type="button" class="prof-cabeza" data-accion="pend-abrir" data-valor="' + e.id + '" aria-expanded="' + abierto + '">' +
+      '<span class="prof-titulo">' + esc(e.titulo) + '</span><span class="prof-cuenta">' + (faltan.length ? 'faltan ' + faltan.length : 'completo') +
+      '<span class="prof-flecha" aria-hidden="true">' + (abierto ? '▲' : '▼') + '</span></span></button>';
+    if (abierto) {
+      // Las que se tildan acá quedan a la vista (tildadas) hasta cerrar el tema, por si hay que destildar
+      var lista = e.preguntas.map(function (q, i) { return { q: q, i: i, on: t.indexOf(i) >= 0 }; })
+        .filter(function (x) { return !x.on || reciente.indexOf(x.i) >= 0; });
+      html += lista.map(function (x) {
+        return '<button type="button" class="prof-fila" aria-pressed="' + x.on + '" data-accion="pend-tilde" data-campo="' + e.id + '" data-valor="' + x.i + '">' +
+          '<span class="prof-caja" aria-hidden="true">' + (x.on ? '✓' : '') + '</span><span>' + esc(x.q) + '</span></button>';
+      }).join('') + '<button type="button" class="btn chico" data-accion="pend-abrir" data-valor="' + e.id + '">Cerrar</button>';
+    }
+    return html + '</div>';
+  }
+
+  REGIONES.grab = barraGrabacion;
+  ENT.forEach(function (e) { REGIONES['pend-' + e.id] = function () { return cuadroPendientes(e); }; });
+  ENT.forEach(function (e) { REGIONES['prof-' + e.id] = function () { return cuadroProfundizar(e); }; });
+
+  function vConsentimiento() {
+    var r = estado.actual, c = r.consent || {};
+    var puede = c.participa === 'Sí', graba = c.grabacion === 'Sí';
+    var html = '<main class="pantalla">' + barra('#/jornada', 'Antes de empezar', 'Consentimiento') +
+      '<section class="tarjeta"><h2 class="seccion">Para leerle al camionero</h2><ul class="lista-consentimiento">' +
+      (CFG.consentimientoResumen || ['Proyecto de la UNJu sobre riesgo cardiovascular en camioneros del corredor.',
+        'Encuesta, medidas del cuerpo, presión y una punción en el dedo.', 'Puede negarse o retirarse en cualquier momento, sin costo ni pago.',
+        'Todo es confidencial.']).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' +
+      (CFG.consentimientoTexto ? '<details><summary>Ver el texto completo</summary><p style="white-space:pre-line">' + esc(CFG.consentimientoTexto) + '</p></details>' : '') + '</section>' +
+      '<fieldset class="pregunta"><legend>¿Acepta participar (encuesta y mediciones)?</legend>' + grupoOpciones('consent.participa', ['Sí', 'No'], c.participa, false, 'grilla') + '</fieldset>';
+    if (c.participa === 'No') {
+      html += '<p class="tarjeta aviso" style="margin:0">Sin consentimiento no se hace el relevamiento.</p>' +
+        '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px"><button type="button" class="btn" data-accion="descartar">Volver a la jornada</button></div></main>';
+      return html;
+    }
+    html += '<fieldset class="pregunta"><legend>¿Acepta la punción en el dedo?</legend>' + grupoOpciones('consent.puncion', ['Sí', 'No'], c.puncion, false, 'grilla') + '</fieldset>' +
+      '<fieldset class="pregunta"><legend>¿Acepta que se grabe la conversación?</legend>' + grupoOpciones('consent.grabacion', ['Sí', 'No'], c.grabacion, false, 'grilla') + '</fieldset>' +
+      '<div class="casilla-linea grande"><input type="checkbox" id="firma" data-campo="consent.firma"' + (c.firma ? ' checked' : '') + '><label for="firma">Firmó en papel (firma o impresión dactiloscópica).</label></div>';
+    var listo = puede && c.puncion && c.grabacion;
+    var yaGraba = Gr.regId() === r.id && Gr.estado() !== 'inactivo';
+    html += '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:8px">';
+    if (graba && !yaGraba && !Gr.soportado()) html += '<p class="ayuda">Este celular no permite grabar desde la app: usá la grabadora del celular.</p>';
+    html += '<button type="button" class="btn primario" data-accion="consent-seguir"' + (listo ? '' : ' disabled') + '>' +
+      (graba && !yaGraba && Gr.soportado() ? '<span class="punto-grabando"></span>Iniciar grabación y continuar' : 'Continuar') + '</button>' +
+      (listo ? '' : '<span class="ayuda" style="text-align:center">Respondé las tres preguntas para continuar.</span>') +
+      (graba ? '<span class="ayuda" style="text-align:center">Mientras se graba, no bloquees la pantalla ni cambies de app.</span>' : '') + '</div></main>';
+    return html;
+  }
+
+  function vFinal() {
+    var r = estado.actual, t = (r.entrevista || {}).tildadas || {};
+    var pend = ENT.map(function (e) {
+      return { e: e, faltan: e.preguntas.length - (t[e.id] || []).length };
+    }).filter(function (x) { return x.faltan > 0; });
+    var graba = Gr.regId() === r.id && Gr.estado() !== 'inactivo';
+    return '<main class="pantalla">' + region('grab', barraGrabacion()) + barra('#/bio/' + r.id + '/3', 'Después de la biológica', 'Antes de terminar', placaChica(r)) +
+      (pend.length ? '<h2 class="seccion" style="margin:4px 0 0">Quedaron sin tocar (si da el tiempo)</h2>' +
+        '<span class="ayuda" style="margin-top:-8px">Tocá un tema para ver solo las preguntas que faltan y tildalas acá mismo.</span>' +
+        pend.map(function (x) { return region('pend-' + x.e.id, cuadroPendientes(x.e)); }).join('') : '') +
+      '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
+      '<button type="button" class="btn primario" data-accion="ir-resultados">' + (graba ? '<span class="punto-detener"></span>Detener grabación y ver resultados' : 'Ver resultados') + '</button></div></main>';
+  }
+
+  function tamano(b) { return b >= 1048576 ? (Math.round(b / 104857.6) / 10).toString().replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
+  function vAudios() {
+    var lista = estado.audios.slice().sort(function (a, b) { return (b.creado || '').localeCompare(a.creado || ''); });
+    var sinCopiar = lista.filter(function (a) { return !a.copiado; }), copiados = lista.length - sinCopiar.length;
+    var total = lista.reduce(function (s, a) { return s + (a.bytes || 0); }, 0);
+    return '<main class="pantalla">' + barra('#/cierre', 'Cierre de jornada', 'Audios del día') +
+      '<div class="tarjeta"><div class="cifras"><div class="cifra"><span class="rotulo">Grabaciones</span><span class="numero">' + lista.length + '</span></div>' +
+      '<div class="cifra"><span class="rotulo">Ocupan</span><span class="numero" style="font-size:34px">' + tamano(total) + '</span></div></div></div>' +
+      (lista.length ? '<div class="lista">' + lista.map(function (a) {
+        return '<div class="registro"><span class="arriba"><span class="cod">' + esc(a.nombre.replace(/\.(webm|m4a)$/, '')) + '</span><span class="hora">' +
+          Math.max(1, Math.round((a.segundos || 0) / 60)) + ' min · ' + tamano(a.bytes || 0) + '</span></span><span class="abajo">' +
+          (a.copiado ? '<span class="estado sinc">' + ico('check', 16) + 'Copiado a la PC</span>' : '<span class="estado pend"><span class="punto-pendiente"></span>Solo en el celular</span>') +
+          '</span></div>';
+      }).join('') + '</div>' : '<div class="vacio">Todavía no hay grabaciones.</div>') +
+      '<span class="ayuda">Cada audio lleva el código de su encuesta. Al tocar «Pasar» se abre para compartirlo (Drive, correo, WhatsApp) o se guarda en este dispositivo; desde ahí pasalo a la computadora del equipo y confirmá acá cuando ya esté copiado.</span>' +
+      '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
+      '<button type="button" class="btn primario" data-accion="audios-pasar"' + (sinCopiar.length ? '' : ' disabled') + '>' + ico('bajar', 22) + 'Pasar ' + sinCopiar.length + (sinCopiar.length === 1 ? ' audio' : ' audios') + '</button>' +
+      '<button type="button" class="btn" data-accion="audios-liberar"' + (copiados ? '' : ' disabled') + '>Liberar espacio (borrar ' + copiados + (copiados === 1 ? ' ya copiado' : ' ya copiados') + ')</button>' +
+      '<a class="btn azul-claro" href="#/jornada">Volver a la jornada</a></div></main>';
+  }
+
+  function cargarAudios() {
+    return DB.audios().then(function (l) { estado.audios = (l || []).map(function (a) { return a; }); }).catch(function () { estado.audios = []; });
+  }
+
+  function nombreAudio(r) { return (r && r.codigo ? r.codigo : 'sin-codigo-' + String(r ? r.id : '').slice(0, 8)) + '_' + (r ? r.fecha : hoy()); }
+  Gr.nombrePara(function (regId) { return nombreAudio(estado.registros.find(function (x) { return x.id === regId; }) || estado.actual); });
+  function detenerGrabacion(r) {
+    return Gr.detener(nombreAudio(r)).then(function (a) {
+      if (!a) return;
+      r.audio = r.audio || { archivos: [], segundos: 0 };
+      if (r.audio.archivos.indexOf(a.nombre) < 0) r.audio.archivos.push(a.nombre);
+      r.audio.segundos = (r.audio.segundos || 0) + (a.segundosTotales || a.segundos || 0);
+      tocar();
+      anotar('Grabación guardada', (r.participante_id || 'sin ID') + ' · ' + Math.max(1, Math.round((a.segundosTotales || a.segundos) / 60)) + ' min');
+      return cargarAudios();
+    });
+  }
+
   /* Respaldo cifrado de todo lo que hay en el dispositivo. Devuelve la huella del archivo. */
   function respaldoCifrado() {
     var aj = estado.ajustes;
@@ -1004,7 +1283,7 @@
     var el = e.target;
     if (el.id === 'archivos-paquete') { importarArchivos(el.files); el.value = ''; return; }
     if (!el.dataset.campo) return;
-    if (el.type === 'checkbox') { asignar(el.dataset.campo, el.checked); if (!estado.actual || estado.ruta.vista !== 'participante') render(); return; }
+    if (el.type === 'checkbox') { asignar(el.dataset.campo, el.checked); if (!estado.actual || ['participante', 'consentimiento'].indexOf(estado.ruta.vista) < 0) render(); return; }
     if (el.tagName === 'SELECT') {
       var ruta = el.dataset.campo, id = ruta.split('.')[1], def = DEF[id] || {}, antes = valor(ruta);
       if (def.detalles && antes && def.detalles[antes] && antes !== el.value) asignar('socio.' + def.detalles[antes].id, '');
@@ -1055,6 +1334,18 @@
       return DB.todos();
     }).then(function (regs) {
       estado.registros = regs || [];
+      return Gr.recuperar(function (regId) { var x = estado.registros.find(function (y) { return y.id === regId; }); return x ? nombreAudio(x) : null; }).then(function (rec) {
+        // Grabaciones interrumpidas (la app se cerró de golpe): se agregan a su relevamiento
+        rec.forEach(function (a) {
+          var r = estado.registros.find(function (x) { return x.id === a.regId; });
+          if (!r) return;
+          r.audio = r.audio || { archivos: [], segundos: 0 };
+          if (r.audio.archivos.indexOf(a.nombre) < 0) { r.audio.archivos.push(a.nombre); r.audio.segundos = (r.audio.segundos || 0) + a.segundos; }
+          r.modificado = ahoraISO(); DB.guardar(r);
+          anotar('Grabación recuperada', r.participante_id || 'sin ID');
+        });
+      }).catch(function () {}).then(cargarAudios);
+    }).then(function () {
       window.addEventListener('hashchange', alCambiarRuta);
       window.addEventListener('online', function () { estado.online = true; render(); });
       window.addEventListener('offline', function () { estado.online = false; render(); });

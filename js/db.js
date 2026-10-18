@@ -4,8 +4,8 @@
  */
 (function () {
   'use strict';
-  var NOMBRE = 'relevamiento-corredor';
-  var VERSION = 1;
+  var NOMBRE = (window.CONFIG && window.CONFIG.almacen) || 'relevamiento-corredor';
+  var VERSION = 2; // 2 (prueba 1.5): grabaciones de audio
   var promesa = null;
 
   function abrir() {
@@ -19,6 +19,9 @@
           s.createIndex('fecha', 'fecha');
         }
         if (!db.objectStoreNames.contains('ajustes')) db.createObjectStore('ajustes');
+        // Audio: los trozos se guardan mientras se graba (por si se corta la app) y al terminar se unen en un archivo.
+        if (!db.objectStoreNames.contains('audio_partes')) db.createObjectStore('audio_partes', { keyPath: 'clave' }).createIndex('tramo', 'tramo');
+        if (!db.objectStoreNames.contains('audios')) db.createObjectStore('audios', { keyPath: 'nombre' });
       };
       pedido.onsuccess = function () { ok(pedido.result); };
       pedido.onerror = function () { error(pedido.error); };
@@ -47,6 +50,12 @@
     todos: function () { return operar('registros', 'readonly', function (s) { return s.getAll(); }); },
     borrar: function (id) { return operar('registros', 'readwrite', function (s) { return s.delete(id); }); },
     borrarTodos: function () { return operar('registros', 'readwrite', function (s) { return s.clear(); }); },
+    guardarParte: function (p) { return operar('audio_partes', 'readwrite', function (s) { return s.put(p); }); },
+    partes: function () { return operar('audio_partes', 'readonly', function (s) { return s.getAll(); }); },
+    borrarPartes: function (claves) { return operar('audio_partes', 'readwrite', function (s) { claves.forEach(function (k) { s.delete(k); }); return null; }); },
+    guardarAudio: function (a) { return operar('audios', 'readwrite', function (s) { return s.put(a); }); },
+    audios: function () { return operar('audios', 'readonly', function (s) { return s.getAll(); }); },
+    borrarAudio: function (nombre) { return operar('audios', 'readwrite', function (s) { return s.delete(nombre); }); },
     leerAjuste: function (clave) { return operar('ajustes', 'readonly', function (s) { return s.get(clave); }); },
     guardarAjuste: function (clave, valor) { return operar('ajustes', 'readwrite', function (s) { return s.put(valor, clave); }); }
   };
