@@ -779,7 +779,10 @@
       (estado.instalar ? '<button type="button" class="btn chico azul-claro" data-accion="instalar">Instalar la app</button>' : '') + '</section>' +
       vZonaCuidado() + vBitacora() +
       '<p class="ayuda">App ' + esc(VERSION_APP) + ' · instrumento ' + esc(I.CUESTIONARIO.version) + ' · ' + estado.registros.length + ' relevamientos guardados · almacenamiento ' +
-      (estado.persistente === true ? 'protegido' : estado.persistente === false ? 'no protegido: hacé respaldos frecuentes' : 'sin verificar') + '</p></main>';
+      (estado.persistente === true ? 'protegido' : estado.persistente === false ? 'no protegido: hacé respaldos frecuentes' : 'sin verificar') + '</p>' +
+      '<p class="ayuda" style="text-align:center;margin-top:2px">© 2026 Fabiola Paz. Todos los derechos reservados. Obra protegida por la Ley 11.723 de Propiedad Intelectual. ' +
+      'Documento de trabajo en elaboración, de circulación restringida: se autoriza su uso exclusivamente para el relevamiento en el campo; no se autoriza su adaptación ' +
+      'ni su uso con otros fines sin autorización escrita de la autora.</p></main>';
   }
 
   function vZonaCuidado() {
