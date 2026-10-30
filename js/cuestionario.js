@@ -19,7 +19,7 @@
   var A_CARGO = ['Ninguna', '1', '2', '3', '4', '5', 'Más de 5'];
 
   var CUESTIONARIO = {
-    version: '2026-10-v3', // v2 (app 1.4): diastólica; «Ninguna» en 4 y 5; país de la licencia. v3 (app 1.5): consentimiento detallado, grabación y entrevista integrada
+    version: '2026-10-v4', // v2 (app 1.4): diastólica; «Ninguna» en 4 y 5; país de la licencia. v3 (app 1.5): consentimiento detallado, grabación y entrevista integrada. v4 (app 1.6): sin «comparte app»; nombre en contacto; glucometría según la punción del consentimiento; biológica en 2 pasos
     titulo: 'Encuesta sociodemográfica · Conductores de camiones del Corredor Bioceánico - Jujuy',
     secciones: [
       {
@@ -166,7 +166,8 @@
     { id: 'b_glucosa_previa', texto: '¿Tuvo glucosa elevada en sangre alguna vez?', opciones: SI_NO },
     { id: 'b_antec_fam_dbt', texto: 'Antecedentes familiares de diabetes', opciones: ['No', 'Sí, parientes lejanos', 'Sí, primer grado'] },
     { id: 'b_fuma', texto: '¿Fuma tabaco?', opciones: SI_NO },
-    { id: 'g_acepta', texto: '¿Acepta evaluarse el nivel de azúcar en sangre?', opciones: SI_NO },
+    // 1.6: ya no se pregunta; se completa solo con la respuesta a la punción del consentimiento
+    { id: 'g_acepta', texto: 'Acepta la medición de glucemia (punción aceptada en el consentimiento)', opciones: SI_NO },
     { id: 'g_hora_ingesta', texto: 'Hora de la última ingesta (líquido o sólido)' },
     { id: 'g_que_ingirio', texto: '¿Qué comió o bebió?' },
     { id: 'g_hora_medicion', texto: 'Hora de la medición' },
@@ -200,7 +201,6 @@
     { id: 'encuestador', texto: 'Encuestador/a' },
     { id: 'puesto', texto: 'Puesto o lugar de relevamiento' },
     { id: 'consentimiento', texto: 'Consentimiento informado' },
-    { id: 'comparte_app', texto: 'Acepta compartir con la app de camioneros' },
     { id: 'socio_respondidas', texto: 'Preguntas sociodemográficas respondidas' },
     { id: 'socio_completo', texto: 'Módulo sociodemográfico completo' },
     { id: 'bio_completo', texto: 'Módulo biológico completo' },
@@ -210,7 +210,8 @@
     { id: 'modificado', texto: 'Última modificación (fecha y hora)' }
   ];
 
-  var CONTACTO = ['id', 'participante_id', 'codigo', 'correo', 'celular', 'consentimiento', 'comparte_app', 'fecha'];
+  // 1.6: se agrega el nombre (primero, con el celular) y se quita «comparte_app». Hoja Contactos: confidencial.
+  var CONTACTO = ['id', 'participante_id', 'codigo', 'nombre', 'celular', 'correo', 'consentimiento', 'fecha'];
 
   /* ENTREVISTA EN PROFUNDIDAD (app 1.5).
      Solo las preguntas de la guía de entrevista que NO están en la encuesta (para no repetir lo que ya se preguntó

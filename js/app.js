@@ -17,7 +17,7 @@
     sinSincronizar: 'Sin sincronizar', nuevoRelevamiento: 'Nuevo relevamiento', buscar: 'Buscar por código o celular',
     relevamientosHoy: 'Relevamientos de hoy', cerrarJornada: 'Cerrar jornada y sincronizar', nuevoParticipante: 'Nuevo participante',
     identificacion: 'Identificación', codigoIdentificacion: 'Código de identificación', datosContacto: 'Datos de contacto',
-    consentimiento: 'Leyó y aceptó el consentimiento informado.', comparteApp: 'Acepta que sus resultados se vean en la app de camioneros.',
+    consentimiento: 'Leyó y aceptó el consentimiento informado.',
     continuarSocio: 'Continuar con sociodemográfica', irDirectoBio: 'Ir directo a la biológica', cejaSocio: 'Paso 2 · Sociodemográfica',
     irABio: 'Ir a biológica', cejaBio: 'Paso 3 · Biológica', verResultados: 'Ver resultados', cejaResultados: 'Paso 4 · Cierre',
     resultados: 'Resultados', guardarYVolver: 'Guardar y volver a la jornada', cierreJornada: 'Cierre de jornada',
@@ -148,6 +148,11 @@
     else if (vacio) delete obj[clave];
     else obj[clave] = valor;
     if (grupo === 'consent' && clave === 'participa') reg.consentimiento = valor === 'Sí';
+    // 1.6: la glucometría ya no se pregunta en la biológica; sale de la punción aceptada en el consentimiento
+    if (grupo === 'consent' && clave === 'puncion') {
+      reg.bio = reg.bio || {};
+      if (valor === 'Sí' || valor === 'No') reg.bio.g_acepta = valor; else delete reg.bio.g_acepta;
+    }
     if (grupo === 'reg' && (clave === 'orden' || clave === 'edad' || clave === 'cp')) {
       reg.codigo = R.codigo(reg.orden, reg.edad, reg.cp);
       // El ID interno sale del N° de orden: si se corrige el orden, se corrige el ID.
@@ -174,7 +179,7 @@
     var r = ruta();
     return guardarActual().then(function () {
       estado.ruta = r;
-      var conId = ['consentimiento', 'participante', 'socio', 'bio', 'final', 'resultados'].indexOf(r.vista) >= 0;
+      var conId = ['consentimiento', 'participante', 'socio', 'bio', 'final', 'resultados', 'hoja'].indexOf(r.vista) >= 0;
       if (!conId) { estado.actual = null; render(true); return; }
       if (estado.actual && estado.actual.id === r.id) { marcarParte(); render(true); return; }
       var enMemoria = estado.registros.find(function (x) { return x.id === r.id; });
@@ -210,6 +215,7 @@
     else if (v === 'socio') html = vSocio();
     else if (v === 'bio') html = vBio();
     else if (v === 'resultados') html = vResultados();
+    else if (v === 'hoja') html = vHoja();
     else if (v === 'cierre') html = vCierre();
     else if (v === 'ajustes') html = vAjustes();
     else if (v === 'importar') html = vImportar();
@@ -468,17 +474,20 @@
     html += campoTexto('reg.encuestador', T.encuestadoresEntrevista, r.encuestador, { ayuda: T.ayudaEncuestadores, placeholder: 'Nombre y apellido' });
 
 
-    html += '<section style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
-      '<h2 class="seccion">' + esc(T.datosContacto) + '</h2><span class="ayuda">Se guardan aparte de las respuestas</span></div>' +
-      campoTexto('contacto.correo', 'Correo electrónico', (r.contacto || {}).correo, { tipo: 'email', placeholder: 'nombre@correo.com', autocomplete: 'off' }) +
-      campoTexto('contacto.celular', 'Celular', (r.contacto || {}).celular, { tipo: 'tel', placeholder: '+54 9 388 …', inputmode: 'tel' }) + '</section>';
+    // 1.6: nombre y celular primero; el correo queda como optativo. Se guardan aparte (hoja Contactos), nunca con las respuestas.
+    var k = r.contacto || {};
+    html += '<section style="display:flex;flex-direction:column;gap:8px">' +
+      '<h2 class="seccion">' + esc(T.datosContacto) + ' <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--tinta-2)">(información confidencial)</span></h2>' +
+      '<span class="ayuda" style="margin-top:-4px">Se guardan aparte de las respuestas.</span>' +
+      campoTexto('contacto.nombre', 'Nombre', k.nombre, { placeholder: 'Nombre y apellido', autocomplete: 'off' }) +
+      campoTexto('contacto.celular', 'Celular', k.celular, { tipo: 'tel', placeholder: '+54 9 388 …', inputmode: 'tel' }) +
+      campoTexto('contacto.correo', 'Correo electrónico (optativo)', k.correo, { tipo: 'email', placeholder: 'nombre@correo.com', autocomplete: 'off' }) + '</section>';
 
     var cs = r.consent || {};
     html += '<a class="tarjeta" href="#/consentimiento/' + esc(r.id) + '" style="text-decoration:none;color:inherit;gap:4px">' +
       '<span class="seccion">Consentimiento</span><span>' + (r.consentimiento ? 'Participa' : '<b style="color:var(--error)">Falta el consentimiento</b>') +
-      ' · punción: ' + esc(cs.puncion || '—') + ' · grabación: ' + esc(cs.grabacion || '—') + '</span><span class="ayuda">Tocá para revisarlo</span></a>' +
-      '<div class="casilla-linea"><input type="checkbox" id="comparte" data-campo="reg.comparte_app"' + (r.comparte_app ? ' checked' : '') + '>' +
-      '<label for="comparte">' + esc(T.comparteApp) + '</label></div>';
+      ' · punción: ' + esc(cs.puncion || '—') + ' · grabación: ' + esc(cs.grabacion || '—') + '</span><span class="ayuda">Tocá para revisarlo</span></a>';
+    // 1.6: se quitó «Acepta que sus resultados se vean en la app de camioneros» (se prestaba a malas interpretaciones).
 
     html += '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
       '<button type="button" class="btn primario" data-accion="continuar" data-valor="socio">' + esc(T.continuarSocio) + ico('seguir', 22) + '</button>' +
@@ -547,7 +556,8 @@
   }
 
   /* ---------- Biológica ---------- */
-  var PASOS_BIO = CFG.pasosBio || ['Mediciones', 'Antecedentes y hábitos', 'Glucometría'];
+  var PASOS_BIO = CFG.pasosBio || ['Antecedentes y hábitos', 'Mediciones y glucometría'];
+  var NB = PASOS_BIO.length; // cantidad de pasos de la biológica (1.6: 2)
 
   function preguntaBio(id, disposicion, nota) {
     var b = BIO[id], v = (estado.actual.bio || {})[id];
@@ -569,9 +579,7 @@
     filas += '<div class="calc-fila"><span>PAD <b>' + esc(b.b_pad_mmhg || '—') + '</b></span><span class="pts">no puntúa</span></div>';
     var avisoPA = pas !== null && pad !== null && pad >= pas
       ? '<span class="error-linea">' + ico('alerta', 18) + 'Revisá la presión: la diastólica es igual o mayor que la sistólica.</span>' : '';
-    if (estado.ruta.n === 2) {
-      filas += '<div class="calc-fila"><span>Tabaco y diabetes</span><span class="pts">FH ' + pts(fh, 'tabaco') + ' · ' + pts(fh, 'diabetes') + '</span></div>';
-    }
+    filas += '<div class="calc-fila"><span>Tabaco y diabetes</span><span class="pts">FH ' + pts(fh, 'tabaco') + ' · ' + pts(fh, 'diabetes') + '</span></div>';
     var notas = [];
     if (fr.aplica === false) notas.push('FINDRISK no corresponde: ' + fr.motivo.toLowerCase() + '.');
     if (fh.aplica === false) notas.push('Framingham no corresponde: ' + fh.motivo.toLowerCase() + '.');
@@ -585,9 +593,9 @@
     if (fr.aplica === false) { linea1 = 'FINDRISK no corresponde'; linea2 = fr.motivo; }
     else if (fr.completo) { linea1 = 'FINDRISK <b>' + fr.puntos + ' pts</b>'; linea2 = fr.categoria + ' · ' + fr.probabilidad; }
     else { linea1 = 'FINDRISK parcial <b>' + fr.puntos + ' pts</b>'; linea2 = 'Faltan ' + fr.faltan.length + ' ítems del test'; }
-    var siguiente = n < 3 ? '#/bio/' + r.id + '/' + (n + 1) : '#/final/' + r.id;
+    var siguiente = n < NB ? '#/bio/' + r.id + '/' + (n + 1) : '#/final/' + r.id;
     return '<div class="fila-pie"><div class="resumen-pie"><span>' + linea1 + '</span><span style="color:var(--tinta-2)">' + esc(linea2) + '</span></div>' +
-      '<a class="btn primario" style="min-height:56px;font-size:17px;padding:0 22px;flex:none" href="' + siguiente + '">' + (n < 3 ? 'Siguiente' : 'Antes de terminar') + ico('seguir', 22) + '</a></div>';
+      '<a class="btn primario" style="min-height:56px;font-size:17px;padding:0 22px;flex:none" href="' + siguiente + '">' + (n < NB ? 'Siguiente' : 'Antes de terminar') + ico('seguir', 22) + '</a></div>';
   };
 
   REGIONES.ayuno = function () {
@@ -597,18 +605,25 @@
   };
 
   function vBio() {
-    var r = estado.actual, n = Math.min(Math.max(estado.ruta.n || 1, 1), 3), b = r.bio || {};
+    var r = estado.actual, n = Math.min(Math.max(estado.ruta.n || 1, 1), NB), b = r.bio || {};
     estado.ruta.n = n;
     var volver = n === 1 ? '#/socio/' + r.id + '/' + SECC.length : '#/bio/' + r.id + '/' + (n - 1);
     var html = '<main class="pantalla">' + region('grab', barraGrabacion()) + barra(volver, T.cejaBio, PASOS_BIO[n - 1], placaChica(r)) +
-      '<nav class="pasos" aria-label="Partes del módulo biológico" style="grid-template-columns:repeat(3,minmax(0,1fr))">' + PASOS_BIO.map(function (t, i) {
+      '<nav class="pasos" aria-label="Partes del módulo biológico" style="grid-template-columns:repeat(' + NB + ',minmax(0,1fr))">' + PASOS_BIO.map(function (t, i) {
         return '<a class="paso ' + (i + 1 === n ? 'actual' : i + 1 < n ? 'hecho' : '') + '" href="#/bio/' + r.id + '/' + (i + 1) + '" style="text-decoration:none"><span class="barrita"></span>' + t + '</a>';
       }).join('') + '</nav>';
 
     if (n === 1) {
+      // 1.6: Antecedentes y hábitos va primero (sigue el hilo de las preguntas); después se mide todo junto.
       var nota = b.b_dbt_dx === 'No' ? '<span class="ok-linea">' + ico('check', 16) + 'Se aplica el test FINDRISK</span>'
         : b.b_dbt_dx === 'Sí' ? '<span class="ayuda">Con diagnóstico de diabetes no se realiza FINDRISK.</span>' : '';
-      html += preguntaBio('b_dbt_dx', 'grilla', nota) + preguntaBio('b_sexo', 'grilla') +
+      html += preguntaBio('b_sexo', 'grilla') + preguntaBio('b_dbt_dx', 'grilla', nota) +
+        preguntaBio('b_act_fisica', 'grilla') + preguntaBio('b_fyv_diario', 'grilla') + preguntaBio('b_hta_dx', 'grilla') +
+        preguntaBio('b_med_antihta', 'grilla', '<span class="ayuda">Se usa en FINDRISK y en Framingham (no se vuelve a preguntar).</span>') +
+        preguntaBio('b_glucosa_previa', 'grilla', '<span class="ayuda">Glucemia alta en algún momento: embarazo, estudios, etc.</span>') +
+        preguntaBio('b_antec_fam_dbt', null, '<span class="ayuda">Primer grado: padres, hermanos.</span>') + preguntaBio('b_fuma', 'grilla');
+    } else {
+      html += '<h2 class="seccion" style="margin:2px 0 -4px">Medidas del cuerpo y presión</h2>' +
         '<div class="grilla-campos">' +
         campoNumero('bio.b_peso_kg', 'Peso', b.b_peso_kg, { unidad: 'kg', min: RANGOS.peso[0], max: RANGOS.peso[1], ayuda: 'Con un decimal' }) +
         campoNumero('bio.b_altura_m', 'Altura', b.b_altura_m, { unidad: 'm', min: RANGOS.altura[0], max: RANGOS.altura[1], ayuda: 'Válido ' + fmt(RANGOS.altura[0], 2) + '–' + fmt(RANGOS.altura[1], 2) }) +
@@ -617,17 +632,15 @@
         '<div class="grilla-campos">' +
         campoNumero('bio.b_pas_mmhg', 'Presión sistólica', b.b_pas_mmhg, { unidad: 'mmHg', min: RANGOS.pas[0], max: RANGOS.pas[1], ayuda: 'La «alta». Tres cifras' }) +
         campoNumero('bio.b_pad_mmhg', 'Presión diastólica', b.b_pad_mmhg, { unidad: 'mmHg', min: RANGOS.pad[0], max: RANGOS.pad[1], ayuda: 'La «baja». Dos o tres cifras' }) +
-        '</div>' + region('calcBio', REGIONES.calcBio());
-    } else if (n === 2) {
-      html += preguntaBio('b_act_fisica', 'grilla') + preguntaBio('b_fyv_diario', 'grilla') + preguntaBio('b_hta_dx', 'grilla') +
-        preguntaBio('b_med_antihta', 'grilla', '<span class="ayuda">Se usa en FINDRISK y en Framingham (no se vuelve a preguntar).</span>') +
-        preguntaBio('b_glucosa_previa', 'grilla', '<span class="ayuda">Glucemia alta en algún momento: embarazo, estudios, etc.</span>') +
-        preguntaBio('b_antec_fam_dbt', null, '<span class="ayuda">Primer grado: padres, hermanos.</span>') + preguntaBio('b_fuma', 'grilla') +
-        region('calcBio', REGIONES.calcBio());
-    } else {
-      if ((r.consent || {}).puncion === 'No') html += '<p class="tarjeta aviso" style="margin:0">En el consentimiento <b>no aceptó la punción</b>: marcá «No».</p>';
-      html += preguntaBio('g_acepta', 'grilla');
-      if (b.g_acepta === 'Sí') {
+        '</div>';
+      // Glucometría en la misma pantalla: ya no se pregunta si acepta (se respondió en el consentimiento, punción)
+      var acepta = R.aceptaGluc(r);
+      html += '<h2 class="seccion" style="margin:10px 0 -4px">Glucometría periférica</h2>';
+      if (acepta === 'No') {
+        html += '<p class="tarjeta aviso" style="margin:0">En el consentimiento <b>no aceptó la punción</b>: no se mide.</p>';
+      } else if (acepta !== 'Sí') {
+        html += '<p class="tarjeta aviso" style="margin:0">Falta responder la punción en el <a href="#/consentimiento/' + esc(r.id) + '">consentimiento</a>.</p>';
+      } else {
         html += '<div class="grilla-campos">' +
           '<div class="campo"><label for="bio-g_hora_ingesta">Hora de la última ingesta</label><input class="entrada mono" type="time" id="bio-g_hora_ingesta" data-campo="bio.g_hora_ingesta" data-refrescar="1" value="' + esc(b.g_hora_ingesta) + '"></div>' +
           '<div class="campo"><label for="bio-g_hora_medicion">Hora de la medición</label><input class="entrada mono" type="time" id="bio-g_hora_medicion" data-campo="bio.g_hora_medicion" data-refrescar="1" value="' + esc(b.g_hora_medicion) + '"></div>' +
@@ -635,9 +648,9 @@
           campoTexto('bio.g_que_ingirio', '¿Qué comió o bebió?', b.g_que_ingirio, {}) +
           campoNumero('bio.g_resultado_mgdl', 'Resultado de glucometría periférica', b.g_resultado_mgdl, { unidad: 'mg/dL', min: RANGOS.glucemia[0], max: RANGOS.glucemia[1] }) +
           '<span class="etiqueta-aviso">' + esc(T.criterioDerivacion) + '</span>';
-      } else if (b.g_acepta === 'No') {
-        html += '<p class="ayuda" style="margin:0">Se registra que no aceptó la medición.</p>';
       }
+      // 1.6.1: un solo «Calculado automáticamente», al final, con todo lo que entra en FINDRISK y Framingham
+      html += region('calcBio', REGIONES.calcBio());
     }
     html += '<div class="pie-fijo empujar-abajo">' + region('pieBio', REGIONES.pieBio()) + '</div></main>';
     return html;
@@ -688,8 +701,9 @@
     html += '</section>';
 
     html += '<section class="tarjeta"><h2 class="seccion">Glucometría periférica</h2>';
-    if (b.g_acepta === 'No') html += '<p>No aceptó la medición.</p>';
-    else if (b.g_acepta !== 'Sí' || !b.g_resultado_mgdl) html += '<p>Sin medición registrada.</p>';
+    var aceptaG = R.aceptaGluc(r);
+    if (aceptaG === 'No') html += '<p>No aceptó la punción.</p>';
+    else if (aceptaG !== 'Sí' || !b.g_resultado_mgdl) html += '<p>Sin medición registrada.</p>';
     else {
       html += '<div class="resultado-cabeza"><span class="grande-num"><span class="n" style="font-size:44px">' + esc(b.g_resultado_mgdl) + '</span><span class="u">mg/dL</span></span>' +
         '<span class="categoria"><span style="font-weight:700">' + (c.ayunoMin != null ? 'Ayuno de ' + C.formatoAyuno(c.ayunoMin) : 'Ayuno sin calcular') + '</span>' +
@@ -699,8 +713,109 @@
     html += '</section>';
 
     html += '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
+      '<a class="btn" href="#/hoja/' + esc(r.id) + '">' + ico('bajar', 22) + 'Hoja para el camionero</a>' +
       '<button type="button" class="btn primario" data-accion="finalizar">' + ico('check', 22) + esc(T.guardarYVolver) + '</button></div></main>';
     return html;
+  }
+
+  /* ---------- Hoja para el camionero (1.6) ----------
+     Solo los valores medidos, a modo de agradecimiento. SIN diagnóstico, puntajes ni categorías de riesgo
+     (FINDRISK y Framingham quedan para el equipo). Identifica con el código, nunca con el nombre.
+     Los textos se cambian en config.js (hojaCamionero) y deben estar validados por un profesional del equipo. */
+  var HOJA = Object.assign({
+    titulo: 'Gracias por participar',
+    subtitulo: 'Estas son las medidas que le tomamos hoy.',
+    nota: '',
+    pie: 'Grupo de investigación «Mirando la Región» · Universidad Nacional de Jujuy',
+    logo: 'icons/logo-proyecto.png'
+  }, CFG.hojaCamionero || {});
+
+  function fechaLarga(iso) { var p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : (iso || ''); }
+
+  function datosHoja(r) {
+    var b = r.bio || {}, filas = [];
+    function v(x) { return x == null || String(x).trim() === '' ? '' : String(x).trim().replace('.', ','); }
+    if (v(b.b_peso_kg)) filas.push({ rotulo: 'Peso', valor: v(b.b_peso_kg), unidad: 'kg' });
+    if (v(b.b_altura_m)) filas.push({ rotulo: 'Altura', valor: v(b.b_altura_m), unidad: 'm' });
+    if (v(b.b_perimetro_cm)) filas.push({ rotulo: 'Perímetro abdominal', valor: v(b.b_perimetro_cm), unidad: 'cm' });
+    if (v(b.b_pas_mmhg) || v(b.b_pad_mmhg)) filas.push({ rotulo: 'Presión arterial', valor: (v(b.b_pas_mmhg) || '—') + ' / ' + (v(b.b_pad_mmhg) || '—'), unidad: 'mmHg' });
+    if (R.aceptaGluc(r) === 'Sí' && v(b.g_resultado_mgdl)) {
+      var horas = [b.g_hora_ingesta ? 'Última comida o bebida: ' + b.g_hora_ingesta : '', b.g_hora_medicion ? 'medición: ' + b.g_hora_medicion : '']
+        .filter(Boolean).join(' · ');
+      filas.push({ rotulo: 'Azúcar en sangre (glucemia capilar)', valor: v(b.g_resultado_mgdl), unidad: 'mg/dL', nota: horas });
+    }
+    return { fecha: fechaLarga(r.fecha), puesto: r.puesto || '', codigo: r.codigo || '', filas: filas };
+  }
+
+  function vHoja() {
+    var r = estado.actual, d = datosHoja(r);
+    var html = '<main class="pantalla">' + '<div class="no-imprimir">' + barra('#/resultados/' + r.id, 'Para entregar', 'Hoja para el camionero', placaChica(r)) + '</div>' +
+      '<span class="ayuda no-imprimir">Solo las medidas tomadas hoy, sin diagnóstico ni niveles de riesgo. Se identifica con el código, no con el nombre.</span>' +
+      '<article class="hoja-camionero"><img class="logo" src="' + esc(HOJA.logo) + '" alt="Proyecto Camionero" width="130" height="130">' +
+      '<h2>' + esc(HOJA.titulo) + '</h2><p class="sub">' + esc(HOJA.subtitulo) + '</p>' +
+      '<p class="meta">' + esc(d.fecha) + (d.puesto ? ' · ' + esc(d.puesto) : '') + '<br>Código <span class="mono">' + esc(d.codigo || '—') + '</span></p>' +
+      (d.filas.length ? d.filas.map(function (f) {
+        return '<div class="hoja-fila"><span>' + esc(f.rotulo) + (f.nota ? '<span class="n">' + esc(f.nota) + '</span>' : '') + '</span>' +
+          '<span class="v">' + esc(f.valor) + '<span class="u">' + esc(f.unidad) + '</span></span></div>';
+      }).join('') : '<p class="hoja-nota">Todavía no hay medidas cargadas.</p>') +
+      (HOJA.nota ? '<p class="hoja-nota">' + esc(HOJA.nota) + '</p>' : '') +
+      '<p class="hoja-pie">' + esc(HOJA.pie) + '</p></article>' +
+      '<div class="empujar-abajo no-imprimir" style="display:flex;flex-direction:column;gap:10px">' +
+      '<button type="button" class="btn primario" data-accion="hoja-compartir"' + (d.filas.length ? '' : ' disabled') + '>' + ico('bajar', 22) + 'Compartir como imagen (WhatsApp)</button>' +
+      '<button type="button" class="btn" data-accion="hoja-imprimir"' + (d.filas.length ? '' : ' disabled') + '>Imprimir o guardar en PDF</button>' +
+      '<a class="btn azul-claro" href="#/resultados/' + esc(r.id) + '">Volver a resultados</a></div></main>';
+    return html;
+  }
+
+  /* Dibuja la hoja como imagen (1080 × 1350, formato vertical que se ve bien en WhatsApp). */
+  function imagenHoja(r) {
+    var d = datosHoja(r), W = 1080, H = 1350;
+    var fuentes = document.fonts && document.fonts.load ? Promise.all([
+      document.fonts.load('700 72px "Barlow Condensed"'), document.fonts.load('400 34px "Atkinson Hyperlegible"'),
+      document.fonts.load('600 52px "IBM Plex Mono"')]).catch(function () {}) : Promise.resolve();
+    var logo = new Promise(function (ok) {
+      var im = new Image(); im.onload = function () { ok(im); }; im.onerror = function () { ok(null); }; im.src = HOJA.logo;
+    });
+    return Promise.all([fuentes, logo]).then(function (res) {
+      var im = res[1], cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      var g = cv.getContext('2d');
+      var AZUL = '#0F3D66', TINTA = '#1C1E21', TINTA2 = '#4A4E54', LINEA = '#DCD6C8';
+      var TIT = '"Barlow Condensed", "Arial Narrow", sans-serif', TXT = '"Atkinson Hyperlegible", "Segoe UI", sans-serif', MONO = '"IBM Plex Mono", monospace';
+      g.fillStyle = '#FFFDF8'; g.fillRect(0, 0, W, H);
+      g.fillStyle = AZUL; g.fillRect(0, 0, W, 16);
+      var y = 50;
+      if (im) { g.drawImage(im, (W - 260) / 2, y, 260, 260); y += 290; } else y += 40;
+      g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+      g.fillStyle = AZUL; g.font = '700 72px ' + TIT; g.fillText(HOJA.titulo, W / 2, y + 40); y += 95;
+      g.fillStyle = TINTA2; g.font = '400 34px ' + TXT; g.fillText(HOJA.subtitulo, W / 2, y); y += 50;
+      g.font = '400 28px ' + TXT; g.fillText(d.fecha + (d.puesto ? ' · ' + d.puesto : ''), W / 2, y); y += 40;
+      g.font = '500 28px ' + MONO; g.fillText('Código ' + (d.codigo || '—'), W / 2, y); y += 45;
+      d.filas.forEach(function (f) {
+        g.strokeStyle = LINEA; g.lineWidth = 2; g.beginPath(); g.moveTo(90, y); g.lineTo(W - 90, y); g.stroke();
+        var alto = f.nota ? 128 : 100;
+        g.textAlign = 'left'; g.fillStyle = TINTA; g.font = '400 36px ' + TXT; g.fillText(f.rotulo, 90, y + 62);
+        if (f.nota) { g.fillStyle = TINTA2; g.font = '400 24px ' + TXT; g.fillText(f.nota, 90, y + 102); }
+        g.textAlign = 'right'; g.fillStyle = TINTA2; g.font = '400 28px ' + TXT;
+        var anchoU = g.measureText(f.unidad).width; g.fillText(f.unidad, W - 90, y + 62);
+        g.fillStyle = AZUL; g.font = '600 52px ' + MONO; g.fillText(f.valor, W - 90 - anchoU - 12, y + 64);
+        y += alto;
+      });
+      g.strokeStyle = LINEA; g.beginPath(); g.moveTo(90, y); g.lineTo(W - 90, y); g.stroke();
+      if (HOJA.nota) {
+        g.textAlign = 'center'; g.fillStyle = TINTA2; g.font = '400 28px ' + TXT;
+        // texto en varias líneas si no entra
+        var palabras = HOJA.nota.split(' '), linea = '', ly = y + 55;
+        palabras.forEach(function (p) {
+          var prueba = linea ? linea + ' ' + p : p;
+          if (g.measureText(prueba).width > W - 200 && linea) { g.fillText(linea, W / 2, ly); ly += 38; linea = p; } else linea = prueba;
+        });
+        if (linea) g.fillText(linea, W / 2, ly);
+      }
+      g.textAlign = 'center'; g.fillStyle = TINTA2; g.font = '400 24px ' + TXT;
+      g.strokeStyle = LINEA; g.beginPath(); g.moveTo(90, H - 80); g.lineTo(W - 90, H - 80); g.stroke();
+      g.fillText(HOJA.pie, W / 2, H - 40);
+      return new Promise(function (ok) { cv.toBlob(function (bl) { ok(bl); }, 'image/png'); });
+    });
   }
 
   /* ---------- Cierre de jornada ---------- */
@@ -829,7 +944,7 @@
     'nuevo': function () {
       var aj = estado.ajustes;
       var r = { id: uuid(), participante_id: '', orden: String(siguienteOrden()), edad: '', cp: '', codigo: '', fecha: hoy(), hora_inicio: horaAhora(),
-        equipo: aj.equipo, dispositivo: aj.dispositivo, encuestador: aj.encuestador, puesto: aj.puesto, consentimiento: false, comparte_app: false,
+        equipo: aj.equipo, dispositivo: aj.dispositivo, encuestador: aj.encuestador, puesto: aj.puesto, consentimiento: false,
         contacto: {}, socio: {}, bio: {}, estado: 'borrador', creado: ahoraISO(), modificado: null, sincronizado: null,
         version_instrumento: I.CUESTIONARIO.version };
       estado.actual = r;
@@ -855,7 +970,6 @@
         var previos = Array.isArray(antes) ? antes : (antes ? [antes] : []);
         previos.forEach(function (op) { if (sel.indexOf(op) < 0 && def.detalles[op]) asignar(grupo + '.' + def.detalles[op].id, ''); });
       }
-      if (ruta === 'bio.g_acepta' && nuevo === 'Sí' && !valor('bio.g_hora_medicion')) asignar('bio.g_hora_medicion', horaAhora());
       // País de nacimiento de habla hispana: se tilda solo «Español» en entiende/habla (no hace falta preguntarlo).
       // Solo agrega: si ya se desmarcó a mano, o el país es otro, no se toca.
       if (ruta === 'socio.p01_nac_pais' && ['Argentina', 'Chile', 'Paraguay'].indexOf(nuevo) >= 0) {
@@ -884,6 +998,20 @@
         estado.registros = estado.registros.filter(function (x) { return !r || x.id !== r.id; });
         estado.actual = null; ir('#/jornada');
       });
+    },
+    'hoja-compartir': function () {
+      var r = estado.actual;
+      imagenHoja(r).then(function (bl) {
+        if (!bl) throw new Error('no se pudo armar la imagen');
+        return S.compartirODescargar('mediciones_' + (r.codigo || 'sin-codigo') + '_' + r.fecha + '.png', bl, 'image/png', 'Sus mediciones');
+      }).then(function (modo) { anotar('Hoja del camionero', (r.participante_id || 'sin ID') + ' · ' + modo); },
+        function (e) { if (!(e && e.name === 'AbortError')) toast('No se pudo compartir: ' + (e && e.message || 'error')); });
+    },
+    'hoja-imprimir': function () { window.print(); },
+    'rec-retomar': function () {
+      var r = estado.actual;
+      Gr.iniciar(r.id, nombreAudio(r)).then(function () { anotar('Grabación retomada', r.participante_id || 'sin ID'); toast('Grabando de nuevo'); },
+        function (e) { toast('No se pudo grabar: ' + (e && e.message || 'sin permiso para el micrófono') + '. Usá la grabadora del celular.'); });
     },
     'rec-pausa': function () { Gr.pausar(); },
     'rec-reanudar': function () { Gr.reanudar().catch(function (e) { toast('No se pudo seguir grabando: ' + e.message); }); },
@@ -1078,7 +1206,16 @@
 
   function barraGrabacion() {
     var r = estado.actual;
-    if (!r || Gr.regId() !== r.id) return '';
+    if (!r) return '';
+    if (Gr.regId() !== r.id) {
+      // 1.6: aceptó la grabación pero no se está grabando (Android cerró la app al salir, o se detuvo):
+      // se puede retomar desde cualquier pantalla, sin volver al consentimiento. Sigue en un archivo «_parte2».
+      if ((r.consent || {}).grabacion === 'Sí' && Gr.soportado() && r.estado !== 'finalizado' && r.consentimiento) {
+        return '<div class="barra-grabacion cortada" role="alert"><span>No se está grabando</span>' +
+          '<button type="button" class="btn chico" data-accion="rec-retomar">Retomar grabación</button></div>';
+      }
+      return '';
+    }
     var st = Gr.estado();
     if (st === 'cortado') {
       return '<div class="barra-grabacion cortada" role="alert"><span>La grabación se cortó</span>' +
@@ -1095,7 +1232,7 @@
   function nombreParte(rt) {
     if (rt.vista === 'participante') return 'Identificación';
     if (rt.vista === 'socio') return 'Socio ' + rt.n + ' ' + (SECC[rt.n - 1] ? SECC[rt.n - 1].titulo : '');
-    if (rt.vista === 'bio') return 'Biológica ' + rt.n;
+    if (rt.vista === 'bio') return 'Biológica: ' + (PASOS_BIO[rt.n - 1] || rt.n);
     if (rt.vista === 'final') return 'Antes de terminar';
     return '';
   }
@@ -1107,7 +1244,9 @@
     r.entrevista = r.entrevista || {};
     var m = r.entrevista.marcas = r.entrevista.marcas || [];
     if (m.some(function (x) { return x.parte === parte; })) return;
-    m.push({ parte: parte, t: minSeg() });
+    // Si la grabación se retomó en otro archivo (_parte2…), el minuto se refiere a ese archivo
+    var nArch = ((r.audio || {}).archivos || []).length + 1;
+    m.push({ parte: parte, t: minSeg() + (nArch > 1 ? ' (parte ' + nArch + ')' : '') });
     tocar();
   }
 
@@ -1177,7 +1316,7 @@
     html += '<button type="button" class="btn primario" data-accion="consent-seguir"' + (listo ? '' : ' disabled') + '>' +
       (graba && !yaGraba && Gr.soportado() ? '<span class="punto-grabando"></span>Iniciar grabación y continuar' : 'Continuar') + '</button>' +
       (listo ? '' : '<span class="ayuda" style="text-align:center">Respondé las tres preguntas para continuar.</span>') +
-      (graba ? '<span class="ayuda" style="text-align:center">Mientras se graba, no bloquees la pantalla ni cambies de app.</span>' : '') + '</div></main>';
+      (graba ? '<span class="ayuda" style="text-align:center">Se graba en WAV. Si salís de la app un momento y al volver la grabación se cortó, tocá «Seguir grabando» o «Retomar grabación» en la barra roja de arriba.</span>' : '') + '</div></main>';
     return html;
   }
 
@@ -1187,7 +1326,7 @@
       return { e: e, faltan: e.preguntas.length - (t[e.id] || []).length };
     }).filter(function (x) { return x.faltan > 0; });
     var graba = Gr.regId() === r.id && Gr.estado() !== 'inactivo';
-    return '<main class="pantalla">' + region('grab', barraGrabacion()) + barra('#/bio/' + r.id + '/3', 'Después de la biológica', 'Antes de terminar', placaChica(r)) +
+    return '<main class="pantalla">' + region('grab', barraGrabacion()) + barra('#/bio/' + r.id + '/' + NB, 'Después de la biológica', 'Antes de terminar', placaChica(r)) +
       (pend.length ? '<h2 class="seccion" style="margin:4px 0 0">Quedaron sin tocar (si da el tiempo)</h2>' +
         '<span class="ayuda" style="margin-top:-8px">Tocá un tema para ver solo las preguntas que faltan y tildalas acá mismo.</span>' +
         pend.map(function (x) { return region('pend-' + x.e.id, cuadroPendientes(x.e)); }).join('') : '') +
@@ -1204,7 +1343,7 @@
       '<div class="tarjeta"><div class="cifras"><div class="cifra"><span class="rotulo">Grabaciones</span><span class="numero">' + lista.length + '</span></div>' +
       '<div class="cifra"><span class="rotulo">Ocupan</span><span class="numero" style="font-size:34px">' + tamano(total) + '</span></div></div></div>' +
       (lista.length ? '<div class="lista">' + lista.map(function (a) {
-        return '<div class="registro"><span class="arriba"><span class="cod">' + esc(a.nombre.replace(/\.(webm|m4a)$/, '')) + '</span><span class="hora">' +
+        return '<div class="registro"><span class="arriba"><span class="cod">' + esc(a.nombre.replace(/\.(webm|m4a|wav)$/, '')) + '</span><span class="hora">' +
           Math.max(1, Math.round((a.segundos || 0) / 60)) + ' min · ' + tamano(a.bytes || 0) + '</span></span><span class="abajo">' +
           (a.copiado ? '<span class="estado sinc">' + ico('check', 16) + 'Copiado a la PC</span>' : '<span class="estado pend"><span class="punto-pendiente"></span>Solo en el celular</span>') +
           '</span></div>';
@@ -1269,6 +1408,12 @@
       if (limpio !== v) { el.value = limpio; v = limpio; }
     }
     asignar(el.dataset.campo, v.trim() === '' ? '' : v);
+    // 1.6: al cargar el resultado de la glucemia, si falta la hora de la medición se pone la hora actual (se puede corregir)
+    if (el.dataset.campo === 'bio.g_resultado_mgdl' && v.trim() && !valor('bio.g_hora_medicion')) {
+      var hm = horaAhora(), campoHora = document.getElementById('bio-g_hora_medicion');
+      asignar('bio.g_hora_medicion', hm);
+      if (campoHora) campoHora.value = hm;
+    }
     if (el.dataset.min !== undefined) {
       var err = mensajeRango(v, el.dataset.min === '' ? null : Number(el.dataset.min), el.dataset.max === '' ? null : Number(el.dataset.max));
       var caja = el.closest('.con-unidad'), ayuda = document.getElementById(el.id + '-ayuda');

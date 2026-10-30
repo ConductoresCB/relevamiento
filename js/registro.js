@@ -75,8 +75,16 @@
   // Versiones del instrumento que no preguntaban la diastólica: no se les exige para «Bio completo».
   var SIN_DIASTOLICA = { '2026-10-v1': true };
 
-  function avanceBio(reg) {
+  /* 1.6: la glucometría ya no se pregunta en la biológica; vale lo que se respondió sobre la punción en el consentimiento.
+     Para relevamientos viejos se respeta lo que ya estaba cargado en g_acepta. */
+  function aceptaGluc(reg) {
     var b = reg.bio || {};
+    return b.g_acepta || ((reg.consent || {}).puncion === 'Sí' || (reg.consent || {}).puncion === 'No' ? reg.consent.puncion : '');
+  }
+
+  function avanceBio(reg) {
+    var b = Object.assign({}, reg.bio || {}), acepta = aceptaGluc(reg);
+    if (acepta) b.g_acepta = acepta;
     var faltan = BIO_OBLIGATORIOS.filter(function (k) {
       if (k === 'b_pad_mmhg' && SIN_DIASTOLICA[reg.version_instrumento]) return false;
       return vacio(b[k]);
@@ -95,7 +103,7 @@
       glucosaPrevia: b.b_glucosa_previa, antecedentes: b.b_antec_fam_dbt });
     var fh = Calc.framingham({ edad: reg.edad, sexo: b.b_sexo, imc: imc, pas: b.b_pas_mmhg,
       medicacion: b.b_med_antihta, fuma: b.b_fuma, dbt: b.b_dbt_dx });
-    var ayuno = b.g_acepta === 'Sí' ? Calc.minutosEntre(b.g_hora_ingesta, b.g_hora_medicion) : null;
+    var ayuno = aceptaGluc(reg) === 'Sí' ? Calc.minutosEntre(b.g_hora_ingesta, b.g_hora_medicion) : null;
     return { imc: imc, findrisk: fr, framingham: fh, ayunoMin: ayuno };
   }
 
@@ -125,7 +133,7 @@
       orden: reg.orden, edad: reg.edad, cp: reg.cp, fecha: reg.fecha, hora_inicio: reg.hora_inicio || '',
       hora_fin: reg.hora_fin || '', equipo: reg.equipo, dispositivo: reg.dispositivo,
       encuestador: reg.encuestador || '', puesto: reg.puesto || '',
-      consentimiento: siNo(reg.consentimiento), comparte_app: siNo(reg.comparte_app),
+      consentimiento: siNo(reg.consentimiento),
       socio_respondidas: as.respondidas, socio_completo: siNo(as.completo), bio_completo: siNo(ab.completo),
       gluc_realizada: siNo(ab.glucemia), estado: reg.estado || 'borrador',
       version_instrumento: reg.version_instrumento || Inst.CUESTIONARIO.version, modificado: reg.modificado || ''
@@ -148,6 +156,7 @@
       else if (id === 'fh_riesgo') v = c.framingham.completo ? c.framingham.riesgo : '';
       else if (id === 'fh_categoria') v = c.framingham.completo ? c.framingham.categoria : '';
       else if (ENT[id] !== undefined) v = ENT[id];
+      else if (id === 'g_acepta') v = aceptaGluc(reg);
       else if (id.charAt(0) === 'b' || id.charAt(0) === 'g') v = b[id];
       else v = resp[id];
       // Preguntas ocultas por un salto no se exportan
@@ -156,8 +165,8 @@
     });
     var k = reg.contacto || {};
     var contacto = { id: reg.id, participante_id: reg.participante_id || '', codigo: reg.codigo || '',
-      correo: k.correo || '', celular: k.celular || '', consentimiento: siNo(reg.consentimiento),
-      comparte_app: siNo(reg.comparte_app), fecha: reg.fecha };
+      nombre: k.nombre || '', celular: k.celular || '', correo: k.correo || '', consentimiento: siNo(reg.consentimiento),
+      fecha: reg.fecha };
     return { fila: fila, contacto: contacto };
   }
 
@@ -204,7 +213,7 @@
   }
 
   var api = { pad: pad, codigo: codigo, idParticipante: idParticipante, vacio: vacio, esVisible: esVisible, respondida: respondida,
-    avanceSocio: avanceSocio, avanceSeccion: avanceSeccion, avanceBio: avanceBio, calcular: calcular,
+    avanceSocio: avanceSocio, avanceSeccion: avanceSeccion, avanceBio: avanceBio, aceptaGluc: aceptaGluc, calcular: calcular,
     pendiente: pendiente, aplanar: aplanar, csv: csv, BIO_OBLIGATORIOS: BIO_OBLIGATORIOS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.Registro = api;
