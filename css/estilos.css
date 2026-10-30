@@ -241,3 +241,21 @@ details.tarjeta > summary { list-style: revert; }
   border-top: 1px solid var(--linea); font-size: 17px; color: var(--tinta); text-decoration: none; }
 .fila-pendiente b { color: var(--azul); }
 .opciones.primera-sola > .opcion:first-child { grid-column: 1 / -1; }
+
+/* ---------- Hoja para el camionero (1.6) ---------- */
+.hoja-camionero { background: #fff; border: 1.5px solid var(--linea); border-radius: 12px; padding: 20px 18px; display: flex; flex-direction: column; gap: 6px; }
+.hoja-camionero .logo { width: 130px; height: 130px; align-self: center; }
+.hoja-camionero h2 { margin: 4px 0 0; font-family: var(--f-titulo); font-size: 32px; line-height: 1.05; font-weight: 700; color: var(--azul-osc); text-align: center; }
+.hoja-camionero .sub { margin: 0; text-align: center; color: var(--tinta-2); }
+.hoja-camionero .meta { margin: 2px 0 8px; text-align: center; font-size: 14px; color: var(--tinta-2); }
+.hoja-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 0; border-top: 1px solid var(--linea); }
+.hoja-fila .n { display: block; font-size: 13px; color: var(--tinta-2); }
+.hoja-fila .v { font-family: var(--f-mono); font-size: 22px; font-weight: 600; color: var(--azul-osc); white-space: nowrap; }
+.hoja-fila .u { margin-left: 5px; font-family: var(--f-texto); font-size: 14px; font-weight: 400; color: var(--tinta-2); }
+.hoja-nota { margin: 6px 0 0; font-size: 14px; color: var(--tinta-2); text-align: center; }
+.hoja-pie { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--linea); font-size: 12px; color: var(--tinta-2); text-align: center; }
+@media print {
+  .no-imprimir, .toast { display: none !important; }
+  html, body { background: #fff; }
+  .hoja-camionero { border: none; max-width: 520px; margin: 0 auto; }
+}
