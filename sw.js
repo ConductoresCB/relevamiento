@@ -10,14 +10,14 @@
  * letra por letra, el navegador no se entera de que hay una versión nueva y sigue usando
  * la app vieja aunque config.js y los demás archivos ya se hayan actualizado.
  */
-// build: 1.5.1
+// build: 1.6.1
 importScripts('js/config.js');
 var PREFIJO = (self.CONFIG && self.CONFIG.prefijoCache) || 'relevamiento';
 var VERSION = PREFIJO + '-' + ((self.CONFIG && self.CONFIG.versionApp) || '1');
 var ARCHIVOS = [
   './', 'index.html', 'manifest.webmanifest', 'css/estilos.css', 'js/config.js',
-  'js/calculos.js', 'js/cuestionario.js', 'js/registro.js', 'js/sync.js', 'js/db.js', 'js/grabacion.js', 'js/app.js',
-  'icons/icono-192.png', 'icons/icono-512.png', 'icons/icono-maskable-512.png'
+  'js/calculos.js', 'js/cuestionario.js', 'js/registro.js', 'js/sync.js', 'js/db.js', 'js/grabacion.js', 'js/captura-worklet.js', 'js/app.js',
+  'icons/icono-192.png', 'icons/icono-512.png', 'icons/icono-maskable-512.png', 'icons/logo-proyecto.png'
 ];
 
 self.addEventListener('install', function (e) {
