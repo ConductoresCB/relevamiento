@@ -714,6 +714,7 @@
 
     html += '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
       '<a class="btn" href="#/hoja/' + esc(r.id) + '">' + ico('bajar', 22) + 'Hoja para el camionero</a>' +
+      '<button type="button" class="btn" data-accion="resultados-imagen">' + ico('bajar', 22) + 'Guardar estos resultados como imagen</button>' +
       '<button type="button" class="btn primario" data-accion="finalizar">' + ico('check', 22) + esc(T.guardarYVolver) + '</button></div></main>';
     return html;
   }
@@ -726,7 +727,7 @@
     titulo: 'Gracias por participar',
     subtitulo: 'Estas son las medidas que le tomamos hoy.',
     nota: '',
-    pie: 'Grupo de investigación «Mirando la Región» · Universidad Nacional de Jujuy',
+    pie: 'Proyecto Camionero · Universidad Nacional de Jujuy',
     logo: 'icons/logo-proyecto.png'
   }, CFG.hojaCamionero || {});
 
@@ -814,6 +815,127 @@
       g.textAlign = 'center'; g.fillStyle = TINTA2; g.font = '400 24px ' + TXT;
       g.strokeStyle = LINEA; g.beginPath(); g.moveTo(90, H - 80); g.lineTo(W - 90, H - 80); g.stroke();
       g.fillText(HOJA.pie, W / 2, H - 40);
+      return new Promise(function (ok) { cv.toBlob(function (bl) { ok(bl); }, 'image/png'); });
+    });
+  }
+
+  /* ---------- Imagen de resultados para el equipo (1.6.2) ----------
+     Lo que ve el equipo en la pantalla de Resultados, como imagen para guardar o pasar a la computadora.
+     NO es para entregarle al camionero (eso es la «Hoja para el camionero», sin diagnóstico ni riesgos).
+     Se identifica con el código del relevamiento, nunca con el nombre. */
+  function datosResultados(r) {
+    var b = r.bio || {}, c = R.calcular(r), fr = c.findrisk, fh = c.framingham, aceptaG = R.aceptaGluc(r);
+    function v(x) { return x == null || String(x).trim() === '' ? '' : String(x).trim().replace('.', ','); }
+    var medidas = [
+      { rotulo: 'Peso', valor: v(b.b_peso_kg) || '—', unidad: 'kg' },
+      { rotulo: 'Altura', valor: v(b.b_altura_m) || '—', unidad: 'm' },
+      { rotulo: 'IMC', valor: c.imc != null ? fmt(c.imc, 1) : '—', unidad: 'kg/m²' },
+      { rotulo: 'Perímetro abdominal', valor: v(b.b_perimetro_cm) || '—', unidad: 'cm' },
+      { rotulo: 'Presión arterial', valor: (v(b.b_pas_mmhg) || '—') + ' / ' + (v(b.b_pad_mmhg) || '—'), unidad: 'mmHg' }
+    ];
+    var gluc;
+    if (aceptaG === 'No') gluc = { rotulo: 'Glucometría', valor: 'No aceptó la punción', unidad: '' };
+    else if (aceptaG !== 'Sí' || !v(b.g_resultado_mgdl)) gluc = { rotulo: 'Glucometría', valor: 'Sin medición', unidad: '' };
+    else gluc = { rotulo: 'Glucometría periférica', valor: v(b.g_resultado_mgdl), unidad: 'mg/dL',
+      nota: (c.ayunoMin != null ? 'Ayuno de ' + C.formatoAyuno(c.ayunoMin) : 'Ayuno sin calcular') +
+        (b.g_hora_ingesta ? ' · última ingesta ' + b.g_hora_ingesta : '') + (b.g_hora_medicion ? ' · medición ' + b.g_hora_medicion : '') };
+    medidas.push(gluc);
+
+    function test(a, etiquetas) {
+      if (a.aplica === false) return { estado: 'No corresponde', nota: a.motivo || '' };
+      if (!a.completo) return { estado: 'Incompleto', nota: 'Faltan: ' + (a.faltan || []).join(', ') };
+      return { puntos: a.puntos, categoria: a.categoria, nota: etiquetas(a) };
+    }
+    return {
+      fecha: fechaLarga(r.fecha), puesto: r.puesto || '', codigo: r.codigo || '',
+      encuestador: r.encuestador || '', edad: r.edad || '', sexo: b.b_sexo || '',
+      medidas: medidas,
+      findrisk: test(fr, function (a) { return a.probabilidad + ' de probabilidad de diabetes a 10 años'; }),
+      framingham: test(fh, function (a) { return 'Riesgo ' + String(a.categoria).toLowerCase() + ' · ' + a.riesgo + ' % a 10 años'; })
+    };
+  }
+
+  /* Dibuja los resultados del equipo como imagen (1080 × 1500). */
+  function imagenResultados(r) {
+    var d = datosResultados(r), W = 1080;
+    // El alto se calcula según lo que haya para mostrar, así no queda espacio vacío abajo
+    var altoFilas = d.medidas.reduce(function (s, f) { return s + (f.nota ? 86 : 64); }, 0);
+    var H = 266 + 2 * 48 + altoFilas + 2 * 96 + 210;
+    var fuentes = document.fonts && document.fonts.load ? Promise.all([
+      document.fonts.load('700 56px "Barlow Condensed"'), document.fonts.load('400 30px "Atkinson Hyperlegible"'),
+      document.fonts.load('600 44px "IBM Plex Mono"')]).catch(function () {}) : Promise.resolve();
+    var logo = new Promise(function (ok) {
+      var im = new Image(); im.onload = function () { ok(im); }; im.onerror = function () { ok(null); }; im.src = HOJA.logo;
+    });
+    return Promise.all([fuentes, logo]).then(function (res) {
+      var im = res[1], cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      var g = cv.getContext('2d');
+      var AZUL = '#0F3D66', TINTA = '#1C1E21', TINTA2 = '#4A4E54', LINEA = '#DCD6C8', AVISO = '#FBEFD2', AVISO_T = '#5C3D00';
+      var TIT = '"Barlow Condensed", "Arial Narrow", sans-serif', TXT = '"Atkinson Hyperlegible", "Segoe UI", sans-serif', MONO = '"IBM Plex Mono", monospace';
+      var M = 64;
+      g.fillStyle = '#FFFDF8'; g.fillRect(0, 0, W, H);
+      g.fillStyle = AZUL; g.fillRect(0, 0, W, 14);
+
+      // Cabecera: logo chico a la izquierda, datos del relevamiento a la derecha
+      var y = 56;
+      if (im) g.drawImage(im, M, y, 120, 120);
+      g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+      g.fillStyle = AZUL; g.font = '700 56px ' + TIT; g.fillText('Resultados del relevamiento', M + 148, y + 50);
+      g.fillStyle = TINTA2; g.font = '400 26px ' + TXT;
+      g.fillText(d.fecha + (d.puesto ? ' · ' + d.puesto : ''), M + 148, y + 90);
+      g.fillText([d.edad ? d.edad + ' años' : '', d.sexo, d.encuestador ? 'Encuestador/es: ' + d.encuestador : ''].filter(Boolean).join(' · '), M + 148, y + 124);
+      y += 160;
+      g.fillStyle = TINTA; g.font = '600 44px ' + MONO; g.fillText('Código ' + (d.codigo || '—'), M, y + 10);
+      y += 50;
+
+      function titulo(t) {
+        y += 34;
+        g.textAlign = 'left'; g.fillStyle = AZUL; g.font = '700 32px ' + TIT; g.fillText(t.toUpperCase(), M, y);
+        y += 14;
+        g.strokeStyle = AZUL; g.lineWidth = 2; g.beginPath(); g.moveTo(M, y); g.lineTo(W - M, y); g.stroke();
+      }
+      function fila(f) {
+        var alto = f.nota ? 86 : 64;
+        g.textAlign = 'left'; g.fillStyle = TINTA; g.font = '400 30px ' + TXT; g.fillText(f.rotulo, M, y + 44);
+        if (f.nota) { g.fillStyle = TINTA2; g.font = '400 22px ' + TXT; g.fillText(f.nota, M, y + 76); }
+        g.textAlign = 'right';
+        if (f.unidad) {
+          g.fillStyle = TINTA2; g.font = '400 24px ' + TXT;
+          var anchoU = g.measureText(f.unidad).width; g.fillText(f.unidad, W - M, y + 44);
+          g.fillStyle = AZUL; g.font = '600 40px ' + MONO; g.fillText(f.valor, W - M - anchoU - 12, y + 46);
+        } else {
+          g.fillStyle = TINTA2; g.font = '400 28px ' + TXT; g.fillText(f.valor, W - M, y + 44);
+        }
+        y += alto;
+        g.strokeStyle = LINEA; g.lineWidth = 1.5; g.beginPath(); g.moveTo(M, y); g.lineTo(W - M, y); g.stroke();
+      }
+      function puntaje(nombre, t) {
+        g.textAlign = 'left'; g.fillStyle = TINTA; g.font = '400 30px ' + TXT; g.fillText(nombre, M, y + 48);
+        g.fillStyle = TINTA2; g.font = '400 22px ' + TXT; g.fillText(t.nota || '', M, y + 80);
+        g.textAlign = 'right';
+        if (t.puntos == null) { g.fillStyle = TINTA2; g.font = '400 28px ' + TXT; g.fillText(t.estado, W - M, y + 48); }
+        else {
+          g.fillStyle = TINTA2; g.font = '400 24px ' + TXT;
+          var anchoC = g.measureText(t.categoria).width; g.fillText(t.categoria, W - M, y + 80);
+          g.fillStyle = AZUL; g.font = '600 48px ' + MONO;
+          g.fillText(String(t.puntos) + ' pts', W - M, y + 44);
+        }
+        y += 96;
+        g.strokeStyle = LINEA; g.lineWidth = 1.5; g.beginPath(); g.moveTo(M, y); g.lineTo(W - M, y); g.stroke();
+      }
+
+      titulo('Medidas');
+      d.medidas.forEach(fila);
+      titulo('Puntajes');
+      puntaje('FINDRISK · riesgo de diabetes', d.findrisk);
+      puntaje('Framingham con IMC · riesgo cardiovascular', d.framingham);
+
+      // Aviso al pie: es material del equipo
+      g.fillStyle = AVISO; g.fillRect(M, H - 160, W - 2 * M, 76);
+      g.textAlign = 'center'; g.fillStyle = AVISO_T; g.font = '700 26px ' + TXT;
+      g.fillText('Uso interno del equipo · no se entrega al camionero', W / 2, H - 112);
+      g.fillStyle = TINTA2; g.font = '400 24px ' + TXT;
+      g.fillText(HOJA.pie, W / 2, H - 48);
       return new Promise(function (ok) { cv.toBlob(function (bl) { ok(bl); }, 'image/png'); });
     });
   }
@@ -998,6 +1120,14 @@
         estado.registros = estado.registros.filter(function (x) { return !r || x.id !== r.id; });
         estado.actual = null; ir('#/jornada');
       });
+    },
+    'resultados-imagen': function () {
+      var r = estado.actual;
+      imagenResultados(r).then(function (bl) {
+        if (!bl) throw new Error('no se pudo armar la imagen');
+        return S.compartirODescargar('resultados_' + (r.codigo || 'sin-codigo') + '_' + r.fecha + '.png', bl, 'image/png', 'Resultados ' + (r.codigo || ''));
+      }).then(function (modo) { anotar('Imagen de resultados', (r.participante_id || 'sin ID') + ' · ' + modo); toast('Imagen de resultados lista'); },
+        function (e) { if (!(e && e.name === 'AbortError')) toast('No se pudo guardar: ' + (e && e.message || 'error')); });
     },
     'hoja-compartir': function () {
       var r = estado.actual;
