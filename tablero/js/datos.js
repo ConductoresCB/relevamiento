@@ -50,8 +50,10 @@
     { id: 'sueno_cat', texto: 'Horas de sueño por día (agrupado)', opciones: ['Menos de 6 h', '6 a 7 h', '8 h o más'] }
   ];
 
-  var SECCIONES_ORDEN = ['Relevamiento', 'Origen y educación', 'Hogar', 'Idiomas y licencia', 'Trabajo y recorrido', 'Hábitos en ruta',
-    'Economía y salud', 'Consumos y vínculos', 'Biológica', 'Riesgo calculado', 'Variables derivadas'];
+  // Orden de las secciones en los menús. Desde la 1.7 se toma del cuestionario de la app: si se reordena o se
+  // renombra una sección, el tablero la sigue mostrando sin tocar este archivo.
+  var SECCIONES_ORDEN = ['Relevamiento'].concat(Inst.CUESTIONARIO.secciones.map(function (s) { return s.titulo; }),
+    ['Biológica', 'Riesgo calculado', 'Variables derivadas']);
 
   // Nombres cortos para títulos y ejes (el texto completo de la pregunta queda en v.texto)
   var NOMBRES = {

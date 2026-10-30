@@ -18,8 +18,8 @@
     relevamientosHoy: 'Relevamientos de hoy', cerrarJornada: 'Cerrar jornada y sincronizar', nuevoParticipante: 'Nuevo participante',
     identificacion: 'Identificación', codigoIdentificacion: 'Código de identificación', datosContacto: 'Datos de contacto',
     consentimiento: 'Leyó y aceptó el consentimiento informado.',
-    continuarSocio: 'Continuar con sociodemográfica', irDirectoBio: 'Ir directo a la biológica', cejaSocio: 'Paso 2 · Sociodemográfica',
-    irABio: 'Ir a biológica', cejaBio: 'Paso 3 · Biológica', verResultados: 'Ver resultados', cejaResultados: 'Paso 4 · Cierre',
+    continuarSocio: 'Continuar con la encuesta', irDirectoBio: 'Ir directo a hábitos, salud y mediciones', cejaSocio: 'Paso 2 · Sociodemográfica',
+    irABio: 'Ir a mediciones', cejaBio: 'Paso 3 · Mediciones', verResultados: 'Ver resultados', cejaResultados: 'Paso 4 · Cierre',
     resultados: 'Resultados', guardarYVolver: 'Guardar y volver a la jornada', cierreJornada: 'Cierre de jornada',
     sincronizarAhora: 'Sincronizar ahora', compartirPaquete: 'Compartir paquete del día', descargarCsv: 'Descargar CSV para Excel',
     criterioDerivacion: 'Criterio de derivación: [a definir por el equipo]',
@@ -50,6 +50,7 @@
   var DEF = {};
   SECC.forEach(function (s) {
     s.preguntas.forEach(function (p) {
+      if (p.bio) return; // pregunta de la biológica intercalada: se maneja como las de la biológica
       if (p.tipo === 'grupo') p.campos.forEach(function (c) { DEF[c.id] = c; });
       else DEF[p.id] = p;
     });
@@ -482,6 +483,9 @@
       campoTexto('contacto.nombre', 'Nombre', k.nombre, { placeholder: 'Nombre y apellido', autocomplete: 'off' }) +
       campoTexto('contacto.celular', 'Celular', k.celular, { tipo: 'tel', placeholder: '+54 9 388 …', inputmode: 'tel' }) +
       campoTexto('contacto.correo', 'Correo electrónico (optativo)', k.correo, { tipo: 'email', placeholder: 'nombre@correo.com', autocomplete: 'off' }) + '</section>';
+    // 1.7: el sexo pasa de la biológica a Identificación (se guarda igual, en la columna b_sexo)
+    html += '<fieldset class="pregunta"><legend>' + esc(BIO.b_sexo.texto) + '</legend>' +
+      grupoOpciones('bio.b_sexo', BIO.b_sexo.opciones, (r.bio || {}).b_sexo, false, 'grilla') + '</fieldset>';
 
     var cs = r.consent || {};
     html += '<a class="tarjeta" href="#/consentimiento/' + esc(r.id) + '" style="text-decoration:none;color:inherit;gap:4px">' +
@@ -498,7 +502,16 @@
   }
 
   /* ---------- Sociodemográfica ---------- */
+  /* Pregunta de la biológica que se hace durante la encuesta (1.7): se guarda en la biológica, con su columna de siempre. */
+  function vPreguntaBio(p) {
+    var v = (estado.actual.bio || {})[p.bio];
+    return '<fieldset class="pregunta"><legend><span class="num-preg">' + p.n + '</span>' + esc(p.texto) + '</legend>' +
+      grupoOpciones('bio.' + p.bio, p.opciones, v, false, p.disposicion || null) +
+      (p.ayuda ? '<span class="ayuda">' + esc(p.ayuda) + '</span>' : '') + '</fieldset>';
+  }
+
   function vPregunta(p, resp) {
+    if (p.bio) return vPreguntaBio(p);
     if (!R.esVisible(p, resp)) return '';
     var leg = '<legend><span class="num-preg">' + p.n + '</span>' + esc(p.texto) + '</legend>';
     var cuerpo = '';
@@ -533,7 +546,7 @@
   }
 
   REGIONES.progresoSocio = function () {
-    var r = estado.actual, n = estado.ruta.n, a = R.avanceSocio(r);
+    var r = estado.actual, n = estado.ruta.n, a = R.avanceEncuesta(r);
     return '<div class="fila-progreso"><span><b>Sección ' + n + ' de ' + SECC.length + '</b><span style="color:var(--tinta-2)"> · ' + a.respondidas + ' de ' + a.total + ' respondidas</span></span>' + placaChica(r) + '</div>' +
       '<nav class="segmentos" aria-label="Secciones" style="grid-template-columns:repeat(' + SECC.length + ',minmax(0,1fr))">' + SECC.map(function (s, i) {
         var av = R.avanceSeccion(r, i), cls = i + 1 === n ? 'actual' : av.respondidas === av.total ? 'hecho' : '';
@@ -547,7 +560,7 @@
     var resp = r.socio || {};
     var anterior = n === 1 ? '#/participante/' + r.id : '#/socio/' + r.id + '/' + (n - 1);
     var siguiente = n === SECC.length ? '#/bio/' + r.id + '/1' : '#/socio/' + r.id + '/' + (n + 1);
-    return '<main class="pantalla">' + region('grab', barraGrabacion()) + barra(anterior, T.cejaSocio, s.titulo) +
+    return '<main class="pantalla">' + region('grab', barraGrabacion()) + barra(anterior, 'Paso 2 · ' + (s.bloque || 'Encuesta'), s.titulo) +
       '<div style="display:flex;flex-direction:column;gap:6px">' + region('progresoSocio', REGIONES.progresoSocio()) + '</div>' +
       s.preguntas.map(function (p) { return vPregunta(p, resp); }).join('') +
       ENT.filter(function (e) { return e.seccion === n - 1; }).map(function (e) { return region('prof-' + e.id, cuadroProfundizar(e)); }).join('') +
@@ -556,14 +569,9 @@
   }
 
   /* ---------- Biológica ---------- */
-  var PASOS_BIO = CFG.pasosBio || ['Antecedentes y hábitos', 'Mediciones y glucometría'];
-  var NB = PASOS_BIO.length; // cantidad de pasos de la biológica (1.6: 2)
+  var PASOS_BIO = CFG.pasosBio || ['Mediciones y glucometría'];
+  var NB = 1; // 1.7: la biológica es una sola pantalla (mediciones y glucometría)
 
-  function preguntaBio(id, disposicion, nota) {
-    var b = BIO[id], v = (estado.actual.bio || {})[id];
-    return '<fieldset class="pregunta"><legend>' + esc(b.texto) + '</legend>' +
-      grupoOpciones('bio.' + id, b.opciones, v, false, disposicion) + (nota || '') + '</fieldset>';
-  }
 
   REGIONES.calcBio = function () {
     var r = estado.actual, b = r.bio || {}, c = R.calcular(r), fr = c.findrisk, fh = c.framingham;
@@ -605,24 +613,13 @@
   };
 
   function vBio() {
-    var r = estado.actual, n = Math.min(Math.max(estado.ruta.n || 1, 1), NB), b = r.bio || {};
-    estado.ruta.n = n;
-    var volver = n === 1 ? '#/socio/' + r.id + '/' + SECC.length : '#/bio/' + r.id + '/' + (n - 1);
-    var html = '<main class="pantalla">' + region('grab', barraGrabacion()) + barra(volver, T.cejaBio, PASOS_BIO[n - 1], placaChica(r)) +
-      '<nav class="pasos" aria-label="Partes del módulo biológico" style="grid-template-columns:repeat(' + NB + ',minmax(0,1fr))">' + PASOS_BIO.map(function (t, i) {
-        return '<a class="paso ' + (i + 1 === n ? 'actual' : i + 1 < n ? 'hecho' : '') + '" href="#/bio/' + r.id + '/' + (i + 1) + '" style="text-decoration:none"><span class="barrita"></span>' + t + '</a>';
-      }).join('') + '</nav>';
-
-    if (n === 1) {
-      // 1.6: Antecedentes y hábitos va primero (sigue el hilo de las preguntas); después se mide todo junto.
-      var nota = b.b_dbt_dx === 'No' ? '<span class="ok-linea">' + ico('check', 16) + 'Se aplica el test FINDRISK</span>'
-        : b.b_dbt_dx === 'Sí' ? '<span class="ayuda">Con diagnóstico de diabetes no se realiza FINDRISK.</span>' : '';
-      html += preguntaBio('b_sexo', 'grilla') + preguntaBio('b_dbt_dx', 'grilla', nota) +
-        preguntaBio('b_act_fisica', 'grilla') + preguntaBio('b_fyv_diario', 'grilla') + preguntaBio('b_hta_dx', 'grilla') +
-        preguntaBio('b_med_antihta', 'grilla', '<span class="ayuda">Se usa en FINDRISK y en Framingham (no se vuelve a preguntar).</span>') +
-        preguntaBio('b_glucosa_previa', 'grilla', '<span class="ayuda">Glucemia alta en algún momento: embarazo, estudios, etc.</span>') +
-        preguntaBio('b_antec_fam_dbt', null, '<span class="ayuda">Primer grado: padres, hermanos.</span>') + preguntaBio('b_fuma', 'grilla');
-    } else {
+    // 1.7: la biológica es solo la pantalla de mediciones y glucometría. Sus preguntas (antecedentes, hábitos, tabaco)
+    // se hacen durante la encuesta, en «Hábitos» y «Salud»; el sexo, en Identificación.
+    var r = estado.actual, b = r.bio || {};
+    estado.ruta.n = 1;
+    var volver = '#/socio/' + r.id + '/' + SECC.length;
+    var html = '<main class="pantalla">' + region('grab', barraGrabacion()) + barra(volver, T.cejaBio, PASOS_BIO[0], placaChica(r));
+    {
       html += '<h2 class="seccion" style="margin:2px 0 -4px">Medidas del cuerpo y presión</h2>' +
         '<div class="grilla-campos">' +
         campoNumero('bio.b_peso_kg', 'Peso', b.b_peso_kg, { unidad: 'kg', min: RANGOS.peso[0], max: RANGOS.peso[1], ayuda: 'Con un decimal' }) +
@@ -643,7 +640,10 @@
       } else {
         html += '<div class="grilla-campos">' +
           '<div class="campo"><label for="bio-g_hora_ingesta">Hora de la última ingesta</label><input class="entrada mono" type="time" id="bio-g_hora_ingesta" data-campo="bio.g_hora_ingesta" data-refrescar="1" value="' + esc(b.g_hora_ingesta) + '"></div>' +
-          '<div class="campo"><label for="bio-g_hora_medicion">Hora de la medición</label><input class="entrada mono" type="time" id="bio-g_hora_medicion" data-campo="bio.g_hora_medicion" data-refrescar="1" value="' + esc(b.g_hora_medicion) + '"></div>' +
+          '<div class="campo"><label for="bio-g_hora_medicion">Hora de la medición</label><div class="con-boton">' +
+          '<input class="entrada mono" type="time" id="bio-g_hora_medicion" data-campo="bio.g_hora_medicion" data-refrescar="1" value="' + esc(b.g_hora_medicion) + '">' +
+          '<button type="button" class="btn chico" data-accion="hora-medicion">Ahora</button></div>' +
+          '<span class="ayuda">Se completa sola con la hora del celular; «Ahora» la actualiza.</span></div>' +
           '</div>' + region('ayuno', REGIONES.ayuno()) +
           campoTexto('bio.g_que_ingirio', '¿Qué comió o bebió?', b.g_que_ingirio, {}) +
           campoNumero('bio.g_resultado_mgdl', 'Resultado de glucometría periférica', b.g_resultado_mgdl, { unidad: 'mg/dL', min: RANGOS.glucemia[0], max: RANGOS.glucemia[1] }) +
@@ -715,8 +715,30 @@
     html += '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
       '<a class="btn" href="#/hoja/' + esc(r.id) + '">' + ico('bajar', 22) + 'Hoja para el camionero</a>' +
       '<button type="button" class="btn" data-accion="resultados-imagen">' + ico('bajar', 22) + 'Guardar estos resultados como imagen</button>' +
+      region('driveResultados', REGIONES.driveResultados()) +
       '<button type="button" class="btn primario" data-accion="finalizar">' + ico('check', 22) + esc(T.guardarYVolver) + '</button></div></main>';
     return html;
+  }
+
+  /* 1.7: subir la imagen de resultados a Drive (carpeta «Resultados del equipo») */
+  REGIONES.driveResultados = function () {
+    var r = estado.actual, d = (r.drive || {}).resultados;
+    if (estado.subiendo === 'resultados') return '<button type="button" class="btn" disabled>Subiendo a Drive…</button>';
+    return '<button type="button" class="btn" data-accion="resultados-drive">' + ico('subir', 22) + (d ? 'Volver a subir a Drive' : 'Subir estos resultados a Drive') + '</button>' +
+      (d ? '<span class="ok-linea" style="justify-content:center">' + ico('check', 16) + 'En Drive · Resultados del equipo</span>' : '');
+  };
+
+  /* Pantalla encendida mientras se sube (si el celular lo permite) */
+  var bloqueoPantalla = null;
+  function pantallaEncendida(si) {
+    if (si && navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').then(function (w) { bloqueoPantalla = w; }).catch(function () {});
+    else if (!si && bloqueoPantalla) { bloqueoPantalla.release().catch(function () {}); bloqueoPantalla = null; }
+  }
+  function puedeSubir() {
+    var aj = estado.ajustes;
+    if (!aj.url || !aj.clave) { toast('Falta cargar la dirección de la planilla y la clave en Ajustes'); return false; }
+    if (!navigator.onLine) { toast('Sin señal: subilo cuando haya internet'); return false; }
+    return true;
   }
 
   /* ---------- Hoja para el camionero (1.6) ----------
@@ -1078,7 +1100,7 @@
       var partes = ruta.split('.'), grupo = partes[0], id = partes[1];
       var def = DEF[id] || {}, antes = valor(ruta), nuevo;
       if (multiple) {
-        var lista = Array.isArray(antes) ? antes.slice() : [];
+        var lista = Array.isArray(antes) ? antes.slice() : (antes ? [antes] : []); // 1.7: la 26 era de una sola opción
         var i = lista.indexOf(val);
         if (i >= 0) lista.splice(i, 1);
         else if (def.exclusiva === val) lista = [val];
@@ -1129,6 +1151,44 @@
       }).then(function (modo) { anotar('Imagen de resultados', (r.participante_id || 'sin ID') + ' · ' + modo); toast('Imagen de resultados lista'); },
         function (e) { if (!(e && e.name === 'AbortError')) toast('No se pudo guardar: ' + (e && e.message || 'error')); });
     },
+    'resultados-drive': function () {
+      var r = estado.actual, aj = estado.ajustes;
+      if (estado.subiendo || !puedeSubir()) return;
+      estado.subiendo = 'resultados'; refrescar(); pantallaEncendida(true);
+      imagenResultados(r).then(function (bl) {
+        return S.subirArchivo(aj.url, aj.clave, 'resultados', 'resultados_' + (r.codigo || 'sin-codigo') + '_' + r.fecha + '.png', bl);
+      }).then(function (res) {
+        // Se anota en el relevamiento sin cambiar su fecha de modificación (no hace falta volver a enviarlo a la planilla)
+        r.drive = Object.assign({}, r.drive, { resultados: ahoraISO() });
+        DB.guardar(r);
+        anotar('Resultados subidos a Drive', r.participante_id || 'sin ID');
+        toast(res.yaEstaba ? 'Ya estaba en Drive' : 'Subido a Drive · ' + (res.carpeta || 'Resultados del equipo'));
+      }, function (e) { toast('No se pudo subir: ' + (e && e.message || 'error')); })
+        .then(function () { estado.subiendo = null; pantallaEncendida(false); refrescar(); });
+    },
+    'audios-drive': function () {
+      var aj = estado.ajustes, lista = estado.audios.filter(function (a) { return !a.drive; });
+      if (estado.subiendo || !lista.length || !puedeSubir()) return;
+      estado.subiendo = 'audios'; estado.progresoSubida = { n: 0, total: lista.length, fraccion: 0 }; render(); pantallaEncendida(true);
+      var bien = 0;
+      lista.reduce(function (cadena, a, i) {
+        return cadena.then(function () {
+          estado.progresoSubida = { n: i + 1, total: lista.length, fraccion: 0 }; refrescar();
+          return S.subirArchivo(aj.url, aj.clave, 'audio', a.nombre, a.blob, function (f) { estado.progresoSubida.fraccion = f; refrescar(); })
+            .then(function (res) {
+              // Subido a Drive = ya copiado: después se puede liberar espacio en el celular
+              a.drive = { id: res.id || '', fecha: ahoraISO() }; a.copiado = true; bien++;
+              return DB.guardarAudio(a);
+            });
+        });
+      }, Promise.resolve()).then(function () {
+        anotar('Audios subidos a Drive', bien + ' de ' + lista.length);
+        toast(bien === 1 ? 'Audio subido a Drive · Grabaciones' : bien + ' audios subidos a Drive · Grabaciones');
+      }, function (e) {
+        anotar('Subida de audios a Drive incompleta', bien + ' de ' + lista.length);
+        toast('Se subieron ' + bien + ' de ' + lista.length + '. ' + (e && e.message || 'Error') + '. Probá de nuevo con mejor señal.');
+      }).then(function () { estado.subiendo = null; estado.progresoSubida = null; pantallaEncendida(false); return cargarAudios(); }).then(render);
+    },
     'hoja-compartir': function () {
       var r = estado.actual;
       imagenHoja(r).then(function (bl) {
@@ -1138,6 +1198,8 @@
         function (e) { if (!(e && e.name === 'AbortError')) toast('No se pudo compartir: ' + (e && e.message || 'error')); });
     },
     'hoja-imprimir': function () { window.print(); },
+    // 1.7: la hora de la medición se toma del celular con un toque
+    'hora-medicion': function () { asignar('bio.g_hora_medicion', horaAhora()); render(); },
     'rec-retomar': function () {
       var r = estado.actual;
       Gr.iniciar(r.id, nombreAudio(r)).then(function () { anotar('Grabación retomada', r.participante_id || 'sin ID'); toast('Grabando de nuevo'); },
@@ -1193,7 +1255,7 @@
     'audios-liberar': function () {
       var lista = estado.audios.filter(function (a) { return a.copiado; });
       if (!lista.length) return;
-      if (!window.confirm('Se borran de este celular ' + lista.length + ' audios que ya están copiados en la computadora. ¿Seguir?')) return;
+      if (!window.confirm('Se borran de este celular ' + lista.length + ' audios que ya están copiados (en la computadora o en Drive). ¿Seguir?')) return;
       Promise.all(lista.map(function (a) { return DB.borrarAudio(a.nombre); })).then(function () {
         anotar('Audios borrados del celular', lista.length + ' ya copiados');
         return cargarAudios();
@@ -1209,7 +1271,10 @@
         anotar('Relevamiento iniciado', r.participante_id);
       }
       tocar();
-      ir(b.dataset.valor === 'bio' ? '#/bio/' + r.id + '/1' : '#/socio/' + r.id + '/1');
+      // 1.7: «Ir directo» salta lo personal y laboral, y entra en Hábitos: desde ahí están todas las preguntas
+      // que usan FINDRISK y Framingham, la salud y después las mediciones.
+      var habitos = SECC.findIndex(function (s) { return s.bloque === 'Hábitos'; }) + 1 || 1;
+      ir(b.dataset.valor === 'bio' ? '#/socio/' + r.id + '/' + habitos : '#/socio/' + r.id + '/1');
     },
     'eliminar': function () {
       var r = estado.actual;
@@ -1475,15 +1540,28 @@
       (lista.length ? '<div class="lista">' + lista.map(function (a) {
         return '<div class="registro"><span class="arriba"><span class="cod">' + esc(a.nombre.replace(/\.(webm|m4a|wav)$/, '')) + '</span><span class="hora">' +
           Math.max(1, Math.round((a.segundos || 0) / 60)) + ' min · ' + tamano(a.bytes || 0) + '</span></span><span class="abajo">' +
-          (a.copiado ? '<span class="estado sinc">' + ico('check', 16) + 'Copiado a la PC</span>' : '<span class="estado pend"><span class="punto-pendiente"></span>Solo en el celular</span>') +
+          (a.drive ? '<span class="estado sinc">' + ico('check', 16) + 'En Drive</span>'
+            : a.copiado ? '<span class="estado sinc">' + ico('check', 16) + 'Copiado a la PC</span>' : '<span class="estado pend"><span class="punto-pendiente"></span>Solo en el celular</span>') +
           '</span></div>';
       }).join('') + '</div>' : '<div class="vacio">Todavía no hay grabaciones.</div>') +
-      '<span class="ayuda">Cada audio lleva el código de su encuesta. Al tocar «Pasar» se abre para compartirlo (Drive, correo, WhatsApp) o se guarda en este dispositivo; desde ahí pasalo a la computadora del equipo y confirmá acá cuando ya esté copiado.</span>' +
+      '<span class="ayuda">Cada audio lleva el código de su encuesta. Con señal, «Subir a Drive» los guarda directo en la carpeta «Grabaciones» del Drive del proyecto. «Pasar» los comparte o los guarda en este dispositivo. Lo que ya está en Drive o copiado se puede borrar del celular para liberar espacio.</span>' +
+      region('subidaAudios', REGIONES.subidaAudios()) +
       '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
       '<button type="button" class="btn primario" data-accion="audios-pasar"' + (sinCopiar.length ? '' : ' disabled') + '>' + ico('bajar', 22) + 'Pasar ' + sinCopiar.length + (sinCopiar.length === 1 ? ' audio' : ' audios') + '</button>' +
       '<button type="button" class="btn" data-accion="audios-liberar"' + (copiados ? '' : ' disabled') + '>Liberar espacio (borrar ' + copiados + (copiados === 1 ? ' ya copiado' : ' ya copiados') + ')</button>' +
       '<a class="btn azul-claro" href="#/jornada">Volver a la jornada</a></div></main>';
   }
+
+  /* 1.7: botón y progreso de la subida de audios a Drive */
+  REGIONES.subidaAudios = function () {
+    var faltan = estado.audios.filter(function (a) { return !a.drive; }).length, p = estado.progresoSubida;
+    if (estado.subiendo === 'audios' && p) {
+      return '<div class="tarjeta" role="status"><b>Subiendo a Drive · audio ' + p.n + ' de ' + p.total + ' · ' + Math.round(p.fraccion * 100) + ' %</b>' +
+        '<span class="ayuda">No cierres la app ni bloquees la pantalla hasta que termine.</span></div>';
+    }
+    return '<button type="button" class="btn primario" data-accion="audios-drive"' + (faltan && !estado.subiendo ? '' : ' disabled') + '>' + ico('subir', 22) +
+      (faltan ? 'Subir ' + faltan + (faltan === 1 ? ' audio' : ' audios') + ' a Drive' : 'Todos los audios están en Drive') + '</button>';
+  };
 
   function cargarAudios() {
     return DB.audios().then(function (l) { estado.audios = (l || []).map(function (a) { return a; }); }).catch(function () { estado.audios = []; });
@@ -1538,8 +1616,9 @@
       if (limpio !== v) { el.value = limpio; v = limpio; }
     }
     asignar(el.dataset.campo, v.trim() === '' ? '' : v);
-    // 1.6: al cargar el resultado de la glucemia, si falta la hora de la medición se pone la hora actual (se puede corregir)
-    if (el.dataset.campo === 'bio.g_resultado_mgdl' && v.trim() && !valor('bio.g_hora_medicion')) {
+    // 1.6: al cargar el resultado de la glucemia (1.7: o la hora de la última ingesta), si falta la hora de la
+    // medición se pone la hora actual del celular (se puede corregir o actualizar con «Ahora»)
+    if ((el.dataset.campo === 'bio.g_resultado_mgdl' || el.dataset.campo === 'bio.g_hora_ingesta') && v.trim() && !valor('bio.g_hora_medicion')) {
       var hm = horaAhora(), campoHora = document.getElementById('bio-g_hora_medicion');
       asignar('bio.g_hora_medicion', hm);
       if (campoHora) campoHora.value = hm;

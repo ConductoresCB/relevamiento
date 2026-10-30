@@ -20,7 +20,7 @@
   raiz.CONFIG = {
 
     // Versión de la app. Subila con cada cambio que publiques.
-    versionApp: '1.6.2',
+    versionApp: '1.7.0',
 
     proyecto: {
       nombre: 'Relevamiento',                 // aparece en la pestaña del navegador
@@ -31,8 +31,8 @@
     ajustesIniciales: { equipo: 'A', dispositivo: '1', ordenDesde: 1, ordenHasta: 199 },
 
     // Nombres de las etapas que se ven en las barras de progreso.
-    pasos: ['Identificación', 'Socio', 'Biológica', 'Resultados'],
-    pasosBio: ['Antecedentes y hábitos', 'Mediciones y glucometría'],   // 1.6: primero las preguntas, después todas las mediciones juntas
+    pasos: ['Identificación', 'Encuesta', 'Mediciones', 'Resultados'],
+    pasosBio: ['Mediciones y glucometría'],   // 1.7: las preguntas de la biológica se hacen durante la encuesta
 
     // Textos de botones, títulos y avisos de la interfaz.
     textos: {
@@ -50,11 +50,11 @@
       codigoIdentificacion: 'Código de identificación',
       datosContacto: 'Contacto del camionero entrevistado',
       consentimiento: 'Leyó y aceptó el consentimiento informado.',
-      continuarSocio: 'Continuar con sociodemográfica',
-      irDirectoBio: 'Ir directo a la biológica',
+      continuarSocio: 'Continuar con la encuesta',
+      irDirectoBio: 'Ir directo a hábitos, salud y mediciones',
       cejaSocio: 'Paso 2 · Sociodemográfica',
-      irABio: 'Ir a biológica',
-      cejaBio: 'Paso 3 · Biológica',
+      irABio: 'Ir a mediciones',
+      cejaBio: 'Paso 3 · Mediciones',
       verResultados: 'Ver resultados',
       cejaResultados: 'Paso 4 · Cierre',
       resultados: 'Resultados',

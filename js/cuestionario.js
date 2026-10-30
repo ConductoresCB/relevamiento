@@ -19,12 +19,18 @@
   var A_CARGO = ['Ninguna', '1', '2', '3', '4', '5', 'Más de 5'];
 
   var CUESTIONARIO = {
-    version: '2026-10-v4', // v2 (app 1.4): diastólica; «Ninguna» en 4 y 5; país de la licencia. v3 (app 1.5): consentimiento detallado, grabación y entrevista integrada. v4 (app 1.6): sin «comparte app»; nombre en contacto; glucometría según la punción del consentimiento; biológica en 2 pasos
+    version: '2026-10-v5', // v5 (app 1.7): nuevo orden y numeración; preguntas de la biológica intercaladas en la charla; sexo en identificación. v2 (app 1.4): diastólica; «Ninguna» en 4 y 5; país de la licencia. v3 (app 1.5): consentimiento detallado, grabación y entrevista integrada. v4 (app 1.6): sin «comparte app»; nombre en contacto; glucometría según la punción del consentimiento; biológica en 2 pasos
     titulo: 'Encuesta sociodemográfica · Conductores de camiones del Corredor Bioceánico - Jujuy',
+    // 1.7: orden de la entrevista. Primero lo personal y laboral; después los consumos; al final la salud (acceso, alimentación
+    // y hábitos, diagnósticos), como transición a las mediciones del cuerpo. Alimentación va pegada a Diagnósticos para que las
+    // preguntas de FINDRISK queden en pantallas seguidas. Las preguntas de la biológica que se hacen durante la charla van
+    // intercaladas con { bio: 'id' }: se guardan en la biológica con su columna de siempre, así la planilla y el tablero
+    // no cambian. El número que ve el encuestador se calcula solo según este orden (ver «numerar», más abajo);
+    // el id de la columna conserva el número viejo (p. ej. p20_frutas_verduras), que no se toca.
     secciones: [
       {
-        id: 's1', titulo: 'Origen y educación', preguntas: [
-          { n: 1, id: 'p01_nac_pais', texto: 'Lugar de nacimiento', tipo: 'unica',
+        id: 's1', bloque: 'Sociodemográfica', titulo: 'Origen y educación', preguntas: [
+          { id: 'p01_nac_pais', texto: 'Lugar de nacimiento', tipo: 'unica',
             opciones: ['Argentina', 'Brasil', 'Chile', 'Paraguay', 'Otro país'],
             detalles: {
               'Argentina': { id: 'p01_nac_detalle', etiqueta: 'Provincia' },
@@ -33,123 +39,137 @@
               'Paraguay': { id: 'p01_nac_detalle', etiqueta: 'Departamento' },
               'Otro país': { id: 'p01_nac_detalle', etiqueta: '¿Qué país?' }
             } },
-          { n: 2, id: 'p02_educacion', texto: 'Máximo nivel educativo alcanzado', tipo: 'unica',
+          { id: 'p02_educacion', texto: 'Máximo nivel educativo alcanzado', tipo: 'unica',
             // En el modelo figuraba "Secundaria incompleta" dos veces: se corrigió la segunda a "completa".
             opciones: ['Primaria completa', 'Secundaria incompleta', 'Secundaria completa',
               'Terciario incompleto', 'Terciario completo', 'Universitario incompleto', 'Universitario completo'] }
         ]
       },
       {
-        id: 's2', titulo: 'Hogar', preguntas: [
-          { n: 3, id: 'p03_pareja', texto: '¿Está actualmente en pareja?', tipo: 'unica', opciones: SI_NO },
-          { n: 4, id: 'p04_convive', texto: 'Cantidad de personas con que convive', tipo: 'unica', opciones: CONVIVE, enLinea: true },
-          { n: 5, id: 'p05_a_cargo', texto: 'Cantidad de personas que tiene a cargo', tipo: 'unica', opciones: A_CARGO, enLinea: true }
+        id: 's2', bloque: 'Sociodemográfica', titulo: 'Hogar', preguntas: [
+          { id: 'p03_pareja', texto: '¿Está actualmente en pareja?', tipo: 'unica', opciones: SI_NO },
+          { id: 'p04_convive', texto: 'Cantidad de personas con que convive', tipo: 'unica', opciones: CONVIVE, enLinea: true },
+          { id: 'p05_a_cargo', texto: 'Cantidad de personas que tiene a cargo', tipo: 'unica', opciones: A_CARGO, enLinea: true }
         ]
       },
       {
-        id: 's3', titulo: 'Idiomas y licencia', preguntas: [
-          { n: 6, id: 'p06_idiomas_entiende', texto: '¿Qué idioma(s) entiende?', tipo: 'multiple',
+        id: 's3', bloque: 'Sociodemográfica', titulo: 'Idiomas y licencia', preguntas: [
+          { id: 'p06_idiomas_entiende', texto: '¿Qué idioma(s) entiende?', tipo: 'multiple',
             opciones: ['Español', 'Guaraní', 'Portugués', 'Inglés', 'Otro'],
             detalles: { 'Otro': { id: 'p06_otro', etiqueta: 'Especificar' } } },
-          { n: 7, id: 'p07_idiomas_habla', texto: '¿Qué idioma(s) habla?', tipo: 'multiple',
+          { id: 'p07_idiomas_habla', texto: '¿Qué idioma(s) habla?', tipo: 'multiple',
             opciones: ['Español', 'Guaraní', 'Portugués', 'Inglés', 'Otro'],
             detalles: { 'Otro': { id: 'p07_otro', etiqueta: 'Especificar' } } },
           // 1.4: se pregunta dónde se emitió la licencia, no la categoría (pedido del equipo)
-          { n: 8, id: 'p08_licencia', texto: '¿En qué país obtuvo su licencia de conducir profesional?', tipo: 'multiple',
+          { id: 'p08_licencia', texto: '¿En qué país obtuvo su licencia de conducir profesional?', tipo: 'multiple',
             opciones: ['Argentina', 'Brasil', 'Chile', 'Paraguay', 'Otro'],
             detalles: { 'Otro': { id: 'p08_lic_otro', etiqueta: '¿En qué país?' } } }
         ]
       },
       {
-        id: 's4', titulo: 'Trabajo y recorrido', preguntas: [
-          { n: 9, id: 'p09_rutas_jujuy', texto: '¿Cómo es el estado de las rutas que recorre en Jujuy?', tipo: 'unica',
+        id: 's4', bloque: 'Sociodemográfica', titulo: 'Trabajo y recorrido', preguntas: [
+          { id: 'p09_rutas_jujuy', texto: '¿Cómo es el estado de las rutas que recorre en Jujuy?', tipo: 'unica',
             opciones: ['Muy bueno', 'Bueno', 'Regular', 'Malo', 'Muy malo'] },
-          { n: 10, id: 'p10_anios_chofer', texto: '¿Hace cuántos años trabaja como chofer de camión?', tipo: 'numero',
+          { id: 'p10_anios_chofer', texto: '¿Hace cuántos años trabaja como chofer de camión?', tipo: 'numero',
             unidad: 'años', min: 0, max: 70, decimales: 0 },
-          { n: 11, id: 'p11_recorrido', texto: '¿Qué recorrido está realizando ahora?', tipo: 'unica',
+          { id: 'p11_recorrido', texto: '¿Qué recorrido está realizando ahora?', tipo: 'unica',
             opciones: ['Viaje provincial (Jujuy)', 'Viaje interprovincial', 'Viaje internacional'] },
-          { n: 12, id: 'p12_frecuencia', texto: '¿Con qué frecuencia realiza ese recorrido?', tipo: 'grupo', campos: [
+          { id: 'p12_frecuencia', texto: '¿Con qué frecuencia realiza ese recorrido?', tipo: 'grupo', campos: [
             { id: 'p12_frec_corredor', etiqueta: 'Otros tramos del corredor + Jujuy', tipo: 'lista', opciones: FRECUENCIA,
               detalles: { 'Otro': { id: 'p12_frec_corredor_otro', etiqueta: 'Especificar' } } },
             { id: 'p12_frec_jujuy', etiqueta: 'Tramo Jujuy', tipo: 'lista', opciones: FRECUENCIA,
               detalles: { 'Otro': { id: 'p12_frec_jujuy_otro', etiqueta: 'Especificar' } } }
           ] },
-          { n: 13, id: 'p13_relacion_laboral', texto: '¿Cuál es su relación laboral actual?', tipo: 'unica', enLinea: true,
+          { id: 'p13_relacion_laboral', texto: '¿Cuál es su relación laboral actual?', tipo: 'unica', enLinea: true,
             opciones: ['Empleado', 'Dueño del camión', 'Otro'],
             detalles: { 'Otro': { id: 'p13_otro', etiqueta: 'Especificar' } } },
-          { n: 14, id: 'p14_conformidad', texto: '¿Cómo se siente con su situación laboral actual?', tipo: 'unica',
+          { id: 'p14_conformidad', texto: '¿Cómo se siente con su situación laboral actual?', tipo: 'unica',
             opciones: ['Conforme', 'Parcialmente conforme', 'Disconforme'] },
-          { n: 15, id: 'p15_riesgo_salud', texto: '¿Cree que su trabajo representa un riesgo para su salud?', tipo: 'unica', enLinea: true,
+          { id: 'p15_riesgo_salud', texto: '¿Cree que su trabajo representa un riesgo para su salud?', tipo: 'unica', enLinea: true,
             opciones: ['Sí', 'No', 'Duda'] },
-          { n: 16, id: 'p16_horas_sin_parar', texto: 'Por lo general, ¿cuántas horas conduce sin hacer paradas?', tipo: 'numero',
+          { id: 'p16_horas_sin_parar', texto: 'Por lo general, ¿cuántas horas conduce sin hacer paradas?', tipo: 'numero',
             unidad: 'horas', min: 0, max: 24, decimales: 1 },
-          { n: 17, id: 'p17_paradas', texto: '¿Realiza paradas durante su recorrido?', tipo: 'unica', enLinea: true, opciones: SI_NO }
+          { id: 'p17_paradas', texto: '¿Realiza paradas durante su recorrido?', tipo: 'unica', enLinea: true, opciones: SI_NO },
+          { id: 'p24_siniestro', texto: '¿Ha tenido algún siniestro vial en el último año?', tipo: 'unica', enLinea: true, opciones: SI_NO },
+          { id: 'p25_fin_de_mes', texto: 'Con lo que gana, ¿llega a fin de mes?', tipo: 'unica', enLinea: true,
+            opciones: ['Sí', 'Parcialmente', 'No'] }
         ]
       },
       {
-        id: 's5', titulo: 'Hábitos en ruta', preguntas: [
-          { n: 18, id: 'p18_donde_come', texto: '¿Dónde suele comer durante los viajes?', tipo: 'multiple',
+        id: 's5', bloque: 'Hábitos', titulo: 'Consumos y vínculos', preguntas: [
+          { id: 'p36_coquea', texto: '¿Usted coquea?', tipo: 'unica', enLinea: true, opciones: SI_NO },
+          { id: 'p37_alcohol', texto: '¿Consume bebidas alcohólicas? (en horario NO laboral)', tipo: 'unica', enLinea: true, opciones: SI_NO },
+          { bio: 'b_fuma', ayuda: 'Se usa en Framingham.', disposicion: 'grilla' },
+          { id: 'p38_comunicacion', texto: '¿Con qué frecuencia se comunica con colegas durante sus viajes?', tipo: 'unica', enLinea: true,
+            opciones: ['Siempre', 'A veces', 'Nunca'] },
+          { id: 'p39_comparte_trayectos', texto: '¿Suele compartir trayectos con otros choferes?', tipo: 'unica', enLinea: true, opciones: SI_NO }
+        ]
+      },
+      {
+        id: 's6', bloque: 'Salud', titulo: 'Acceso a la salud', preguntas: [
+          { id: 'p26_cobertura', texto: '¿Tiene cobertura médica?', tipo: 'multiple',
+            opciones: ['Obra social', 'Prepaga', 'Seguro de salud', 'Ninguna'], exclusiva: 'Ninguna' },
+          { id: 'p27_control_medico', texto: '¿Dónde recurre para control médico?', tipo: 'multiple',
+            // 1.7: se pueden marcar varias (antes una sola). Misma columna; «Ninguno» desmarca las demás
+            opciones: ['Sistema público', 'Sistema privado', 'Ninguno'], exclusiva: 'Ninguno' },
+          { id: 'p28_frec_consulta', texto: '¿Con qué frecuencia consulta al médico, aunque no presente síntomas?', tipo: 'unica',
+            opciones: ['Una vez al mes', '2 veces al año', 'Una vez al año', 'Solo cuando me siento mal', 'Nunca'] },
+          { id: 'p29_atencion_dolencias', texto: '¿Dónde recurre para atención de dolencias, malestar o síntomas?', tipo: 'multiple',
+            opciones: ['Sistema público', 'Sistema privado', 'Otros (medicina tradicional, alternativa, etc.)', 'Ninguno'],
+            exclusiva: 'Ninguno' },
+          { id: 'p30_dolores', texto: '¿Tiene dolores frecuentes en alguna parte del cuerpo?', tipo: 'unica', enLinea: true,
+            opciones: SI_NO, detalles: { 'Sí': { id: 'p30_cuales', etiqueta: '¿Qué dolores corporales presenta?' } } },
+          { id: 'p31_automedicacion', texto: 'Sin indicación médica, suele tomar:', tipo: 'multiple',
+            opciones: ['Medicamentos', 'Hierbas', 'Ninguno'], exclusiva: 'Ninguno' },
+          { id: 'p32_cuales_med', texto: '¿Qué medicamentos o hierbas toma?', tipo: 'texto',
+            mostrarSi: { id: 'p31_automedicacion', incluye: ['Medicamentos', 'Hierbas'] } }
+        ]
+      },
+      {
+        id: 's7', bloque: 'Salud', titulo: 'Alimentación y hábitos en ruta', preguntas: [
+          { id: 'p18_donde_come', texto: '¿Dónde suele comer durante los viajes?', tipo: 'multiple',
             opciones: ['Paradores', 'En el camión al costado de la ruta', 'Estaciones de servicio',
               'En casas de familiares o conocidos', 'Otro'],
             detalles: { 'Otro': { id: 'p18_otro', etiqueta: 'Especificar' } } },
-          { n: 19, id: 'p19_horas_sueno', texto: '¿Cuántas horas duerme por día?', tipo: 'numero',
-            unidad: 'horas', min: 0, max: 24, decimales: 1 },
-          { n: 20, id: 'p20_frutas_verduras', texto: '¿Con qué frecuencia consume frutas y verduras mientras está en ruta?', tipo: 'unica',
+          { id: 'p20_frutas_verduras', texto: '¿Con qué frecuencia consume frutas y verduras mientras está en ruta?', tipo: 'unica',
             opciones: ['Todos los días', 'Varias veces por semana', 'Casi nunca', 'Nunca'] },
-          { n: 21, id: 'p21_bebidas', texto: '¿Qué bebidas consume durante sus viajes?', tipo: 'multiple',
+          { bio: 'b_fyv_diario', ayuda: 'Todos los días, en ruta o en casa. Se usa en FINDRISK.', disposicion: 'grilla' },
+          { id: 'p21_bebidas', texto: '¿Qué bebidas consume durante sus viajes?', tipo: 'multiple',
             opciones: ['Agua', 'Jugos artificiales', 'Jugos naturales', 'Gaseosas', 'Café', 'Té', 'Mate', 'Otro'],
             detalles: { 'Otro': { id: 'p21_otro', etiqueta: 'Especificar' } } },
-          { n: 22, id: 'p22_sanitarios', texto: '¿Suele tener acceso a sanitarios en sus recorridos?', tipo: 'unica',
+          { id: 'p35_energeticas', texto: '¿Consume bebidas energéticas durante sus viajes?', tipo: 'multiple',
+            opciones: ['No', 'Café', 'Coca-Cola', 'Pepsi-Cola', 'Yerba mate', 'Energizantes (Speed, Monster, Red Bull, etc.)', 'Otro'],
+            exclusiva: 'No', detalles: { 'Otro': { id: 'p35_otro', etiqueta: 'Especificar' } } },
+          { id: 'p19_horas_sueno', texto: '¿Cuántas horas duerme por día?', tipo: 'numero',
+            unidad: 'horas', min: 0, max: 24, decimales: 1 },
+          { id: 'p22_sanitarios', texto: '¿Suele tener acceso a sanitarios en sus recorridos?', tipo: 'unica',
             opciones: ['Sí, siempre', 'A veces', 'Casi nunca', 'Nunca'] },
-          { n: 23, id: 'p23_recreativas', texto: '¿Dedica tiempo al mes a actividades recreativas (cine, paseos, deporte, etc.)?', tipo: 'unica',
-            opciones: ['Sí', 'Algunas veces', 'Rara vez', 'No'] }
+          { id: 'p23_recreativas', texto: '¿Dedica tiempo al mes a actividades recreativas (cine, paseos, deporte, etc.)?', tipo: 'unica',
+            opciones: ['Sí', 'Algunas veces', 'Rara vez', 'No'] },
+          { id: 'p34_actividad_fisica', texto: '¿Con qué frecuencia realiza actividad física fuera del trabajo?', tipo: 'unica',
+            opciones: ['Varias veces a la semana (4 o más)', '2 a 3 veces por semana', 'Una vez a la semana', 'Rara vez', 'Nunca'] },
+          { bio: 'b_act_fisica', ayuda: 'Al menos 30 minutos por día, en el trabajo o fuera de él. Se usa en FINDRISK.', disposicion: 'grilla' }
         ]
       },
       {
-        id: 's6', titulo: 'Economía y salud', preguntas: [
-          { n: 24, id: 'p24_siniestro', texto: '¿Ha tenido algún siniestro vial en el último año?', tipo: 'unica', enLinea: true, opciones: SI_NO },
-          { n: 25, id: 'p25_fin_de_mes', texto: 'Con lo que gana, ¿llega a fin de mes?', tipo: 'unica', enLinea: true,
-            opciones: ['Sí', 'Parcialmente', 'No'] },
-          { n: 26, id: 'p26_cobertura', texto: '¿Tiene cobertura médica?', tipo: 'multiple',
-            opciones: ['Obra social', 'Prepaga', 'Seguro de salud', 'Ninguna'], exclusiva: 'Ninguna' },
-          { n: 27, id: 'p27_control_medico', texto: '¿Dónde recurre para control médico?', tipo: 'unica',
-            opciones: ['Sistema público', 'Sistema privado', 'Ninguno'] },
-          { n: 28, id: 'p28_frec_consulta', texto: '¿Con qué frecuencia consulta al médico, aunque no presente síntomas?', tipo: 'unica',
-            opciones: ['Una vez al mes', '2 veces al año', 'Una vez al año', 'Solo cuando me siento mal', 'Nunca'] },
-          { n: 29, id: 'p29_atencion_dolencias', texto: '¿Dónde recurre para atención de dolencias, malestar o síntomas?', tipo: 'multiple',
-            opciones: ['Sistema público', 'Sistema privado', 'Otros (medicina tradicional, alternativa, etc.)', 'Ninguno'],
-            exclusiva: 'Ninguno' },
-          { n: 30, id: 'p30_dolores', texto: '¿Tiene dolores frecuentes en alguna parte del cuerpo?', tipo: 'unica', enLinea: true,
-            opciones: SI_NO, detalles: { 'Sí': { id: 'p30_cuales', etiqueta: '¿Qué dolores corporales presenta?' } } },
-          { n: 31, id: 'p31_automedicacion', texto: 'Sin indicación médica, suele tomar:', tipo: 'multiple',
-            opciones: ['Medicamentos', 'Hierbas', 'Ninguno'], exclusiva: 'Ninguno' },
-          { n: 32, id: 'p32_cuales_med', texto: '¿Qué medicamentos o hierbas toma?', tipo: 'texto',
-            mostrarSi: { id: 'p31_automedicacion', incluye: ['Medicamentos', 'Hierbas'] } },
-          { n: 33, id: 'p33_diagnosticos', texto: 'Actualmente, ¿ha sido diagnosticado con alguna enfermedad?', tipo: 'multiple',
+        id: 's8', bloque: 'Salud', titulo: 'Diagnósticos y antecedentes', preguntas: [
+          { id: 'p33_diagnosticos', texto: 'Actualmente, ¿ha sido diagnosticado con alguna enfermedad?', tipo: 'multiple',
             opciones: ['No tengo diagnóstico de enfermedad', 'Musculoesqueléticos', 'Renal', 'Ocular', 'Digestivas',
               'Auditivo', 'Respiratorias', 'Obesidad', 'Osteoarticular', 'VIH/SIDA', 'Otros'],
             exclusiva: 'No tengo diagnóstico de enfermedad',
-            detalles: { 'Otros': { id: 'p33_otro', etiqueta: 'Especificar' } } }
-        ]
-      },
-      {
-        id: 's7', titulo: 'Consumos y vínculos', preguntas: [
-          { n: 34, id: 'p34_actividad_fisica', texto: '¿Con qué frecuencia realiza actividad física fuera del trabajo?', tipo: 'unica',
-            opciones: ['Varias veces a la semana (4 o más)', '2 a 3 veces por semana', 'Una vez a la semana', 'Rara vez', 'Nunca'] },
-          { n: 35, id: 'p35_energeticas', texto: '¿Consume bebidas energéticas durante sus viajes?', tipo: 'multiple',
-            opciones: ['No', 'Café', 'Coca-Cola', 'Pepsi-Cola', 'Yerba mate', 'Energizantes (Speed, Monster, Red Bull, etc.)', 'Otro'],
-            exclusiva: 'No', detalles: { 'Otro': { id: 'p35_otro', etiqueta: 'Especificar' } } },
-          { n: 36, id: 'p36_coquea', texto: '¿Usted coquea?', tipo: 'unica', enLinea: true, opciones: SI_NO },
-          { n: 37, id: 'p37_alcohol', texto: '¿Consume bebidas alcohólicas? (en horario NO laboral)', tipo: 'unica', enLinea: true, opciones: SI_NO },
-          { n: 38, id: 'p38_comunicacion', texto: '¿Con qué frecuencia se comunica con colegas durante sus viajes?', tipo: 'unica', enLinea: true,
-            opciones: ['Siempre', 'A veces', 'Nunca'] },
-          { n: 39, id: 'p39_comparte_trayectos', texto: '¿Suele compartir trayectos con otros choferes?', tipo: 'unica', enLinea: true, opciones: SI_NO }
+            detalles: { 'Otros': { id: 'p33_otro', etiqueta: 'Especificar' } } },
+          { bio: 'b_hta_dx', disposicion: 'grilla' },
+          { bio: 'b_med_antihta', ayuda: 'Se usa en FINDRISK y en Framingham.', disposicion: 'grilla' },
+          { bio: 'b_dbt_dx', ayuda: 'Con diagnóstico de diabetes no se aplica FINDRISK.', disposicion: 'grilla' },
+          { bio: 'b_glucosa_previa', ayuda: 'Glucemia alta en algún momento: embarazo, estudios, etc.', disposicion: 'grilla' },
+          { bio: 'b_antec_fam_dbt', ayuda: 'Primer grado: padres, hermanos. Se usa en FINDRISK.', disposicion: null }
         ]
       }
     ]
   };
 
-  /* Campos del módulo biológico (la pantalla está armada a mano en app.js). */
+  /* Campos del módulo biológico. Desde la 1.7 casi todos se preguntan durante la encuesta (ver { bio: 'id' } en las secciones);
+     en la pantalla de la biológica quedan solo las mediciones y la glucometría (armada a mano en app.js). */
   var BIO = [
     { id: 'b_dbt_dx', texto: '¿Tiene diagnóstico de diabetes?', opciones: SI_NO },
     { id: 'b_sexo', texto: 'Sexo', opciones: ['Mujer', 'Varón', 'Otro'] },
@@ -213,6 +233,21 @@
   // 1.6: se agrega el nombre (primero, con el celular) y se quita «comparte_app». Hoja Contactos: confidencial.
   var CONTACTO = ['id', 'participante_id', 'codigo', 'nombre', 'celular', 'correo', 'consentimiento', 'fecha'];
 
+  /* Numerar: el número que ve el encuestador sigue el orden de las secciones (1, 2, 3…), contando también las
+     preguntas de la biológica intercaladas. Si se mueve una pregunta, la numeración se acomoda sola. */
+  (function numerar() {
+    var defBio = {};
+    BIO.forEach(function (b) { defBio[b.id] = b; });
+    var n = 0;
+    CUESTIONARIO.secciones.forEach(function (s) {
+      s.preguntas.forEach(function (p) {
+        n++;
+        p.n = n;
+        if (p.bio) { var b = defBio[p.bio]; p.texto = b.texto; p.opciones = b.opciones; }
+      });
+    });
+  })();
+
   /* ENTREVISTA EN PROFUNDIDAD (app 1.5).
      Solo las preguntas de la guía de entrevista que NO están en la encuesta (para no repetir lo que ya se preguntó
      de forma cerrada). Cada eje se muestra como un recuadro «Para profundizar» al final de la sección indicada
@@ -236,17 +271,17 @@
       '¿Le hubiera gustado trabajar en otra cosa?', '¿Nota diferencias en las rutas entre provincias o países?',
       '¿Cómo es su trabajo antes de salir y durante el viaje?', '¿Cambia la rutina según el tipo de carga?',
       '¿Cuánto tiempo pasa trabajando fuera de su casa?', '¿Hace changas u otros recorridos para completar ingresos?'] },
-    { id: 'trabajo_salud', titulo: 'Trabajo y salud', seccion: 4, preguntas: [
+    { id: 'trabajo_salud', titulo: 'Trabajo y salud', seccion: 6, preguntas: [  // 1.7: Alimentación y hábitos en ruta
       '¿Cómo ve la salud en relación con su trabajo?', '¿Para qué y dónde hace sus paradas?',
       'Paradores: habilitación, estado, seguridad, comida', '¿Duerme en la cabina del camión?',
       '¿Qué come mientras maneja o cuando para?', 'En su casa, ¿come lo mismo que en los viajes?',
       'En los descansos, ¿hace actividad física o estiramientos?', '¿Cuánto tiempo al mes dedica a la recreación?'] },
-    { id: 'salud', titulo: 'Salud, enfermedad y cuidado', seccion: 5, preguntas: [
+    { id: 'salud', titulo: 'Salud, enfermedad y cuidado', seccion: 5, preguntas: [  // 1.7: Acceso a la salud
       '¿Qué es para usted estar saludable?', '¿Cuándo diría que alguien está enfermo?',
       'Cuando tiene un malestar, ¿cómo lo resuelve?', '¿Va al médico o lo resuelve de otra manera?',
       '¿Zumbidos, palpitaciones, entumecimiento, mareos, visión borrosa, falta de aire?',
       '¿Qué hierbas o yuyos toma?'] },
-    { id: 'entorno', titulo: 'Entorno social y consumos', seccion: 6, preguntas: [
+    { id: 'entorno', titulo: 'Entorno social y consumos', seccion: 4, preguntas: [  // 1.7: Consumos y vínculos
       '¿El contacto con otros choferes le sirve de apoyo en el viaje?',
       'Alcohol: ¿cuándo, qué tipo de bebida y con qué frecuencia?'] }
   ];
@@ -265,6 +300,7 @@
     var cols = META.slice();
     CUESTIONARIO.secciones.forEach(function (s) {
       s.preguntas.forEach(function (p) {
+        if (p.bio) return; // es una columna de la biológica: va con BIO, más abajo
         var lista = p.tipo === 'grupo' ? p.campos : [p];
         lista.forEach(function (c) {
           var texto = (p.tipo === 'grupo' ? p.n + '. ' + p.texto + ' — ' + c.etiqueta : p.n + '. ' + p.texto);
