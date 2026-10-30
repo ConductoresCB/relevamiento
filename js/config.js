@@ -20,7 +20,7 @@
   raiz.CONFIG = {
 
     // Versión de la app. Subila con cada cambio que publiques.
-    versionApp: '1.5.1',
+    versionApp: '1.6.1',
 
     proyecto: {
       nombre: 'Relevamiento',                 // aparece en la pestaña del navegador
@@ -32,7 +32,7 @@
 
     // Nombres de las etapas que se ven en las barras de progreso.
     pasos: ['Identificación', 'Socio', 'Biológica', 'Resultados'],
-    pasosBio: ['Mediciones', 'Antecedentes y hábitos', 'Glucometría'],
+    pasosBio: ['Antecedentes y hábitos', 'Mediciones y glucometría'],   // 1.6: primero las preguntas, después todas las mediciones juntas
 
     // Textos de botones, títulos y avisos de la interfaz.
     textos: {
@@ -50,7 +50,6 @@
       codigoIdentificacion: 'Código de identificación',
       datosContacto: 'Contacto del camionero entrevistado',
       consentimiento: 'Leyó y aceptó el consentimiento informado.',
-      comparteApp: 'Acepta que sus resultados se vean en la app de camioneros.',
       continuarSocio: 'Continuar con sociodemográfica',
       irDirectoBio: 'Ir directo a la biológica',
       cejaSocio: 'Paso 2 · Sociodemográfica',
@@ -88,6 +87,16 @@
     ],
     // Texto completo del consentimiento aprobado (opcional). Si se completa, aparece «Ver el texto completo».
     consentimientoTexto: '',
+
+    // Hoja para el camionero (Resultados › «Hoja para el camionero»). Solo valores medidos, sin diagnóstico.
+    // Cualquier texto que se agregue en «nota» tiene que estar validado por un profesional de salud del equipo.
+    hojaCamionero: {
+      titulo: 'Gracias por participar',
+      subtitulo: 'Estas son las medidas que le tomamos hoy.',
+      nota: '',   // vacío = no se muestra. Ej. (a validar): 'Puede mostrar estos valores en su próximo control de salud.'
+      pie: 'Grupo de investigación «Mirando la Región» · Universidad Nacional de Jujuy',
+      logo: 'icons/logo-proyecto.png'
+    },
 
     // Recomendación que se muestra según el riesgo de Framingham (texto del protocolo).
     recomendacionFramingham: {
