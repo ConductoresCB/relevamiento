@@ -20,7 +20,7 @@
   raiz.CONFIG = {
 
     // Versión de la app. Subila con cada cambio que publiques.
-    versionApp: '1.6.1',
+    versionApp: '1.6.2',
 
     proyecto: {
       nombre: 'Relevamiento',                 // aparece en la pestaña del navegador
@@ -94,7 +94,7 @@
       titulo: 'Gracias por participar',
       subtitulo: 'Estas son las medidas que le tomamos hoy.',
       nota: '',   // vacío = no se muestra. Ej. (a validar): 'Puede mostrar estos valores en su próximo control de salud.'
-      pie: 'Grupo de investigación «Mirando la Región» · Universidad Nacional de Jujuy',
+      pie: 'Proyecto Camionero · Universidad Nacional de Jujuy',
       logo: 'icons/logo-proyecto.png'
     },
 
