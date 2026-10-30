@@ -259,3 +259,7 @@ details.tarjeta > summary { list-style: revert; }
   html, body { background: #fff; }
   .hoja-camionero { border: none; max-width: 520px; margin: 0 auto; }
 }
+
+/* 1.7: campo con botón debajo (hora de la medición): así la hora se ve entera aun en celulares angostos */
+.con-boton { display: flex; flex-direction: column; gap: 6px; }
+.con-boton .btn { min-height: 44px; }

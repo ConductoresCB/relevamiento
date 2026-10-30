@@ -26,7 +26,9 @@
   --g-acento: #1A588F;
   --g-cat-1: #2a78d6; --g-cat-2: #eb6834; --g-cat-3: #1baf7a; --g-cat-4: #eda100;
   --g-cat-5: #e87ba4; --g-cat-6: #008300; --g-cat-7: #4a3aa7; --g-cat-8: #e34948;
-  --g-riesgo: #e6a675,#c38555,#a36737,#844b17,#673000;
+  /* 1.7: riesgo con la MISMA escala de la app (Resultados): bajo claro → muy alto oscuro */
+  --g-riesgo: #EED59B,#DEA553,#CA7322,#A44C1D,#772C1A;
+  --r1: #EED59B; --r2: #DEA553; --r3: #CA7322; --r4: #A44C1D; --r5: #772C1A;
   --g-ord: #86b6ef,#6da7ec,#5598e7,#3987e5,#2a78d6,#256abf,#1c5cab,#184f95,#104281,#0d366b;
 
   --f-texto: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif;
@@ -43,6 +45,7 @@
     --g-cat-1: #3987e5; --g-cat-2: #d95926; --g-cat-3: #199e70; --g-cat-4: #c98500;
     --g-cat-5: #d55181; --g-cat-6: #008300; --g-cat-7: #9085e9; --g-cat-8: #e66767;
     --g-riesgo: #89552a,#a56f45,#c28a5f,#e2a87c,#ffc699;
+    --r1: #89552a; --r2: #a56f45; --r3: #c28a5f; --r4: #e2a87c; --r5: #ffc699;
     --g-ord: #1c5cab,#256abf,#2a78d6,#3987e5,#5598e7,#6da7ec,#86b6ef,#9ec5f4,#b7d3f6,#cde2fb;
     color-scheme: dark;
   }
@@ -56,6 +59,7 @@
   --g-cat-1: #3987e5; --g-cat-2: #d95926; --g-cat-3: #199e70; --g-cat-4: #c98500;
   --g-cat-5: #d55181; --g-cat-6: #008300; --g-cat-7: #9085e9; --g-cat-8: #e66767;
   --g-riesgo: #89552a,#a56f45,#c28a5f,#e2a87c,#ffc699;
+  --r1: #89552a; --r2: #a56f45; --r3: #c28a5f; --r4: #e2a87c; --r5: #ffc699;
   --g-ord: #1c5cab,#256abf,#2a78d6,#3987e5,#5598e7,#6da7ec,#86b6ef,#9ec5f4,#b7d3f6,#cde2fb;
   color-scheme: dark;
 }
@@ -224,3 +228,16 @@ table.datos th button { border: 0; background: none; font-weight: 700; color: in
   .principal { padding: 0; max-width: none; }
   .item-informe { break-inside: avoid; }
 }
+
+/* ---------- 1.7: escala de riesgo como en la pantalla de Resultados de la app ---------- */
+.escala-app { margin: 14px 0 4px; }
+.escala-app .titulo-escala { font-size: 13px; color: var(--tinta-2); margin: 0 0 6px; }
+.escala-app .tramos { display: grid; gap: 2px; }
+.escala-app .tramo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.escala-app .color { height: 14px; border-radius: 4px; }
+.escala-app .mayor .color { outline: 2px solid var(--tinta); outline-offset: 1px; }
+.escala-app .rango { font-family: var(--f-mono); font-size: 12px; color: var(--tinta-2); }
+.escala-app .cat { font-size: 13px; font-weight: 700; color: var(--tinta); line-height: 1.2; }
+.escala-app .cifra { font-size: 13px; color: var(--tinta-2); }
+.escala-app .cifra b { font-family: var(--f-mono); color: var(--tinta); font-size: 16px; }
+@media (max-width: 560px) { .escala-app .tramos { grid-template-columns: 1fr !important; } .escala-app .tramo { flex-direction: row; align-items: baseline; flex-wrap: wrap; } .escala-app .color { width: 40px; flex: none; } }

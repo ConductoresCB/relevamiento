@@ -16,7 +16,7 @@
     fuente: 'Arial, Helvetica, sans-serif', superficie: '#FFFFFF', tinta: '#1C1E21', tinta2: '#4A4E54', tenue: '#676C73',
     grilla: '#E6E1D5', eje: '#C9C2B2', acento: '#1A588F',
     cat: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'],
-    riesgo: ['#e6a675', '#c38555', '#a36737', '#844b17', '#673000'],
+    riesgo: ['#EED59B', '#DEA553', '#CA7322', '#A44C1D', '#772C1A'], // 1.7: misma escala que la app
     ord: ['#86b6ef', '#6da7ec', '#5598e7', '#3987e5', '#2a78d6', '#256abf', '#1c5cab', '#184f95', '#104281', '#0d366b']
   };
   function paletaPantalla() {
@@ -333,6 +333,7 @@
       tabla: { cabecera: [opciones.encabezado || 'Respuesta', 'Cantidad', '% sobre quienes respondieron'],
         filas: cats.map(function (c) { return [c.valor, num(c.n), num(c.pct, 1)]; }).concat([{ total: true, celdas: ['Respondieron', num(f.respondieron), ''] }]) } };
     if (!f.respondieron) g.vacio = opciones.vacio || 'Sin datos con los filtros actuales.';
+    if (opciones.extra && f.respondieron) g.extra = opciones.extra(f);
     g.dibujar = function (t) {
       var col = coloresDe(v, cats.map(function (c) { return c.valor; }), t);
       var unico = !(v.riesgo || v.ordinal);
@@ -395,9 +396,10 @@
     var faltaFr = faltantes(F, '_fr');
     html += tarjeta(graficoFrecuencias('fr', vfr, F, { titulo: 'Riesgo de diabetes a 10 años (FINDRISK)', encabezado: 'Categoría',
       vacio: 'Ningún ' + nombreUnidad(1) + ' tiene todos los datos para FINDRISK. ' + faltaFr,
-      notaPie: 'FINDRISK excluye a quienes tienen diagnóstico de diabetes.' }));
+      notaPie: 'FINDRISK excluye a quienes tienen diagnóstico de diabetes.', extra: escalaApp('fr') }));
     html += tarjeta(graficoFrecuencias('fh', vfh, F, { titulo: 'Riesgo cardiovascular a 10 años (Framingham con IMC)', encabezado: 'Categoría',
-      vacio: 'Ningún ' + nombreUnidad(1) + ' tiene todos los datos para Framingham. ' + faltantes(F, '_fh'), notaPie: 'Framingham con IMC: tablas del protocolo; edades de 20 a 79 años.' }));
+      vacio: 'Ningún ' + nombreUnidad(1) + ' tiene todos los datos para Framingham. ' + faltantes(F, '_fh'), notaPie: 'Framingham con IMC: tablas del protocolo; edades de 20 a 79 años.',
+      extra: escalaApp('fh') }));
     var conImc = F.filter(function (r) { return typeof r.b_imc === 'number'; }).length;
     var con25 = F.filter(function (r) { return r.imc_mayor25; }).length;
     html += conImc >= 0.8 * con25 ? tarjeta(graficoFrecuencias('imc', D.variable('imc_cat'), F, { titulo: 'Índice de masa corporal (OMS)', encabezado: 'Categoría' }))
@@ -409,6 +411,29 @@
     html += tarjeta(graficoFaltantes(F), 'ancha');
     html += '</div>';
     return html;
+  }
+
+  /* 1.7: la misma escala de colores que ve el encuestador en Resultados (app), con cuántos hay en cada tramo.
+     El tramo con más personas lleva un borde. Los rótulos van en texto (no se depende solo del color). */
+  var ESCALAS = {
+    fr: { colores: ['--r1', '--r2', '--r3', '--r4', '--r5'], rangos: ['0–6 pts', '7–11 pts', '12–14 pts', '15–20 pts', '21–26 pts'],
+      cats: ['Bajo', 'Ligeramente elevado', 'Moderado', 'Alto', 'Muy alto'] },
+    fh: { colores: ['--r1', '--r3', '--r5'], rangos: ['menos de 10 %', '10–19 %', '20 % o más'], cats: ['Bajo', 'Moderado', 'Alto'] }
+  };
+  function escalaApp(clave) {
+    var e = ESCALAS[clave];
+    return function (f) {
+      var por = {};
+      f.categorias.forEach(function (c) { por[c.valor] = c; });
+      var max = Math.max.apply(null, e.cats.map(function (c) { return (por[c] || {}).n || 0; }));
+      return '<div class="escala-app"><p class="titulo-escala">Escala de la app (pantalla Resultados) · cuántos hay en cada tramo</p>' +
+        '<div class="tramos" style="grid-template-columns:repeat(' + e.cats.length + ',minmax(0,1fr))">' + e.cats.map(function (c, i) {
+          var x = por[c] || { n: 0, pct: 0 };
+          return '<div class="tramo' + (x.n && x.n === max ? ' mayor' : '') + '"><span class="color" style="background:var(' + e.colores[i] + ')"></span>' +
+            '<span class="rango">' + esc(e.rangos[i]) + '</span><span class="cat">' + esc(c) + '</span>' +
+            '<span class="cifra"><b>' + num(x.n) + '</b> · ' + num(x.pct, 0) + ' %</span></div>';
+        }).join('') + '</div></div>';
+    };
   }
 
   /* Qué dato frena el cálculo de FINDRISK o Framingham con más frecuencia */

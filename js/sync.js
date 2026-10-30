@@ -48,6 +48,64 @@
     }, Promise.resolve()).then(function () { return confirmados; });
   }
 
+  /* ---------- 1.7: subir archivos a Drive (a través del script de la planilla) ----------
+   * Imágenes: de una vez. Audios: el script abre una subida por partes en Drive y se mandan trozos de 4 MB
+   * (múltiplo de 256 KB, como pide Drive), así ningún pedido se acerca al límite de 50 MB de Apps Script.
+   * Si se corta la señal en una parte, se reintenta esa parte; si vuelve a fallar, se puede volver a empezar
+   * más tarde y el script no duplica lo que ya quedó completo. */
+  var TROZO = 4 * 1024 * 1024;
+
+  function blobABase64(blob) {
+    return new Promise(function (ok, mal) {
+      var fr = new FileReader();
+      fr.onload = function () { var s = String(fr.result); ok(s.slice(s.indexOf(',') + 1)); };
+      fr.onerror = function () { mal(fr.error || new Error('No se pudo leer el archivo')); };
+      fr.readAsDataURL(blob);
+    });
+  }
+  function errorScript(resp) {
+    var e = (resp && resp.error) || 'Respuesta inválida del script';
+    if (/Pedido no reconocido/.test(e)) e = 'el script de la planilla todavía no tiene la subida a Drive: hay que actualizarlo a la versión 1.7';
+    return new Error(e);
+  }
+  function conReintento(fn, veces) {
+    return fn().catch(function (e) {
+      if (!veces) throw e;
+      return new Promise(function (ok) { setTimeout(ok, 3000); }).then(function () { return conReintento(fn, veces - 1); });
+    });
+  }
+
+  /* tipo: 'resultados' (imagen) o 'audio'. alAvanzar(fraccion de 0 a 1). Devuelve { id, url, carpeta, yaEstaba }. */
+  function subirArchivo(url, clave, tipo, nombre, blob, alAvanzar) {
+    var mime = blob.type || 'application/octet-stream';
+    if (tipo !== 'audio') {
+      return blobABase64(blob).then(function (datos) {
+        return postJSON(url, { accion: 'subir', token: clave, tipo: tipo, nombre: nombre, mime: mime, datos: datos }, 90000);
+      }).then(function (r) { if (!r || !r.ok) throw errorScript(r); if (alAvanzar) alAvanzar(1); return r; });
+    }
+    var total = blob.size;
+    return postJSON(url, { accion: 'subir_inicio', token: clave, tipo: tipo, nombre: nombre, mime: mime, tamano: total }, 60000).then(function (ini) {
+      if (!ini || !ini.ok) throw errorScript(ini);
+      if (ini.yaEstaba) { if (alAvanzar) alAvanzar(1); return ini; }
+      var trozo = raiz.TROZO_DRIVE_PRUEBA || TROZO; // solo las pruebas automáticas lo achican (256 KB)
+      function parte(desde) {
+        var hasta = Math.min(desde + trozo, total);
+        return blobABase64(blob.slice(desde, hasta)).then(function (datos) {
+          return conReintento(function () {
+            return postJSON(url, { accion: 'subir_trozo', token: clave, tipo: tipo, sesion: ini.sesion, mime: mime, desde: desde, total: total, datos: datos }, 180000);
+          }, 1);
+        }).then(function (r) {
+          if (!r || !r.ok) throw errorScript(r);
+          if (alAvanzar) alAvanzar(hasta / total);
+          if (r.listo) return r;
+          if (hasta >= total) throw new Error('Drive no confirmó el archivo');
+          return parte(hasta);
+        });
+      }
+      return parte(0);
+    });
+  }
+
   /* ---------- Cifrado de paquetes ----------
    * Formato 2 (app 1.4): AES-GCM de 256 bits (Web Crypto del navegador, sin criptografía propia) con una clave
    * derivada de la clave del equipo por PBKDF2-HMAC-SHA256 con 600 000 iteraciones (OWASP 2023), sal aleatoria
@@ -193,7 +251,7 @@
   }
 
   var api = { probarConexion: probarConexion, enviar: enviar, armarPaquete: armarPaquete, abrirPaquete: abrirPaquete,
-    huella: huella, registroValido: registroValido, unir: unir, descargar: descargar, compartirODescargar: compartirODescargar,
+    huella: huella, registroValido: registroValido, unir: unir, descargar: descargar, compartirODescargar: compartirODescargar, subirArchivo: subirArchivo, TROZO: TROZO,
     ITERACIONES: ITERACIONES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.Sync = api;

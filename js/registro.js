@@ -47,12 +47,19 @@
     return !vacio(resp[p.id]);
   }
 
+  /* Solo las preguntas sociodemográficas (las de la biológica intercaladas desde la 1.7 cuentan en «Bio completo»).
+     Así «socio_respondidas» y «socio_completo» siguen midiendo lo mismo que antes. */
   function preguntasVisibles(resp) {
     var lista = [];
     Inst.CUESTIONARIO.secciones.forEach(function (s) {
-      s.preguntas.forEach(function (p) { if (esVisible(p, resp)) lista.push(p); });
+      s.preguntas.forEach(function (p) { if (!p.bio && esVisible(p, resp)) lista.push(p); });
     });
     return lista;
+  }
+
+  /* Para la barra de avance en pantalla: cuenta todas las preguntas de la sección, de la encuesta y de la biológica. */
+  function respondidaEnFlujo(reg, p) {
+    return p.bio ? !vacio((reg.bio || {})[p.bio]) : respondida(p, reg.socio || {});
   }
 
   function avanceSocio(reg) {
@@ -65,9 +72,16 @@
   function avanceSeccion(reg, indice) {
     var resp = reg.socio || {};
     var s = Inst.CUESTIONARIO.secciones[indice];
-    var vis = s.preguntas.filter(function (p) { return esVisible(p, resp); });
-    var hechas = vis.filter(function (p) { return respondida(p, resp); }).length;
+    var vis = s.preguntas.filter(function (p) { return p.bio || esVisible(p, resp); });
+    var hechas = vis.filter(function (p) { return respondidaEnFlujo(reg, p); }).length;
     return { respondidas: hechas, total: vis.length };
+  }
+
+  /* Avance de toda la encuesta en pantalla (sociodemográficas + biológicas intercaladas). */
+  function avanceEncuesta(reg) {
+    var r = { respondidas: 0, total: 0 };
+    Inst.CUESTIONARIO.secciones.forEach(function (s, i) { var a = avanceSeccion(reg, i); r.respondidas += a.respondidas; r.total += a.total; });
+    return r;
   }
 
   var BIO_OBLIGATORIOS = ['b_dbt_dx', 'b_sexo', 'b_peso_kg', 'b_altura_m', 'b_perimetro_cm', 'b_pas_mmhg', 'b_pad_mmhg',
@@ -192,7 +206,7 @@
     if (!principales) {
       principales = {};
       Inst.CUESTIONARIO.secciones.forEach(function (s) {
-        s.preguntas.forEach(function (p) { if (p.tipo !== 'grupo') principales[p.id] = true; });
+        s.preguntas.forEach(function (p) { if (!p.bio && p.tipo !== 'grupo') principales[p.id] = true; });
       });
     }
     return !!principales[id];
@@ -213,7 +227,7 @@
   }
 
   var api = { pad: pad, codigo: codigo, idParticipante: idParticipante, vacio: vacio, esVisible: esVisible, respondida: respondida,
-    avanceSocio: avanceSocio, avanceSeccion: avanceSeccion, avanceBio: avanceBio, aceptaGluc: aceptaGluc, calcular: calcular,
+    avanceSocio: avanceSocio, avanceSeccion: avanceSeccion, avanceEncuesta: avanceEncuesta, avanceBio: avanceBio, aceptaGluc: aceptaGluc, calcular: calcular,
     pendiente: pendiente, aplanar: aplanar, csv: csv, BIO_OBLIGATORIOS: BIO_OBLIGATORIOS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.Registro = api;
