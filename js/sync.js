@@ -75,9 +75,23 @@
     });
   }
 
+  /* 1.7.1: tipo de archivo «limpio». Los audios grabados con la versión 1.5 quedaron como «audio/webm;codecs=opus»:
+     el script espera «audio/webm», así que se saca lo que va después del «;». Si no hay tipo, se deduce de la extensión. */
+  var POR_EXTENSION = { wav: 'audio/wav', webm: 'audio/webm', m4a: 'audio/mp4', mp4: 'audio/mp4', png: 'image/png' };
+  function tipoArchivo(blob, nombre) {
+    var t = String((blob && blob.type) || '').split(';')[0].trim().toLowerCase();
+    if (t === 'audio/x-wav' || t === 'audio/wave') t = 'audio/wav';
+    if (!t) t = POR_EXTENSION[String(nombre || '').split('.').pop().toLowerCase()] || 'application/octet-stream';
+    return t;
+  }
+  /* true si el error es de conexión (vale la pena reintentar con mejor señal), no un rechazo del script */
+  function esErrorDeRed(e) {
+    return !!e && (e.name === 'TypeError' || e.name === 'AbortError' || /servidor respondió|Failed to fetch|NetworkError|network/i.test(e.message || ''));
+  }
+
   /* tipo: 'resultados' (imagen) o 'audio'. alAvanzar(fraccion de 0 a 1). Devuelve { id, url, carpeta, yaEstaba }. */
   function subirArchivo(url, clave, tipo, nombre, blob, alAvanzar) {
-    var mime = blob.type || 'application/octet-stream';
+    var mime = tipoArchivo(blob, nombre);
     if (tipo !== 'audio') {
       return blobABase64(blob).then(function (datos) {
         return postJSON(url, { accion: 'subir', token: clave, tipo: tipo, nombre: nombre, mime: mime, datos: datos }, 90000);
@@ -251,7 +265,7 @@
   }
 
   var api = { probarConexion: probarConexion, enviar: enviar, armarPaquete: armarPaquete, abrirPaquete: abrirPaquete,
-    huella: huella, registroValido: registroValido, unir: unir, descargar: descargar, compartirODescargar: compartirODescargar, subirArchivo: subirArchivo, TROZO: TROZO,
+    huella: huella, registroValido: registroValido, unir: unir, descargar: descargar, compartirODescargar: compartirODescargar, subirArchivo: subirArchivo, tipoArchivo: tipoArchivo, esErrorDeRed: esErrorDeRed, TROZO: TROZO,
     ITERACIONES: ITERACIONES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.Sync = api;
