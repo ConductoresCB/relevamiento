@@ -98,7 +98,7 @@
     var t = document.createElement('div');
     t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = texto;
     document.body.appendChild(t);
-    setTimeout(function () { t.remove(); }, 3200);
+    setTimeout(function () { t.remove(); }, Math.min(10000, Math.max(3200, texto.length * 70))); // 1.7.1: los avisos largos duran más
   }
 
   /* ---------- almacenamiento ---------- */
@@ -1170,7 +1170,8 @@
       var aj = estado.ajustes, lista = estado.audios.filter(function (a) { return !a.drive; });
       if (estado.subiendo || !lista.length || !puedeSubir()) return;
       estado.subiendo = 'audios'; estado.progresoSubida = { n: 0, total: lista.length, fraccion: 0 }; render(); pantallaEncendida(true);
-      var bien = 0;
+      var bien = 0, fallas = [];
+      // 1.7.1: si un audio falla, se sigue con los demás y al final se avisa cuáles quedaron y por qué
       lista.reduce(function (cadena, a, i) {
         return cadena.then(function () {
           estado.progresoSubida = { n: i + 1, total: lista.length, fraccion: 0 }; refrescar();
@@ -1179,14 +1180,14 @@
               // Subido a Drive = ya copiado: después se puede liberar espacio en el celular
               a.drive = { id: res.id || '', fecha: ahoraISO() }; a.copiado = true; bien++;
               return DB.guardarAudio(a);
-            });
+            }, function (e) { fallas.push({ nombre: a.nombre, e: e }); });
         });
       }, Promise.resolve()).then(function () {
-        anotar('Audios subidos a Drive', bien + ' de ' + lista.length);
-        toast(bien === 1 ? 'Audio subido a Drive · Grabaciones' : bien + ' audios subidos a Drive · Grabaciones');
-      }, function (e) {
-        anotar('Subida de audios a Drive incompleta', bien + ' de ' + lista.length);
-        toast('Se subieron ' + bien + ' de ' + lista.length + '. ' + (e && e.message || 'Error') + '. Probá de nuevo con mejor señal.');
+        anotar(fallas.length ? 'Subida de audios a Drive incompleta' : 'Audios subidos a Drive', bien + ' de ' + lista.length);
+        if (!fallas.length) { toast(bien === 1 ? 'Audio subido a Drive · Grabaciones' : bien + ' audios subidos a Drive · Grabaciones'); return; }
+        var red = fallas.some(function (f) { return S.esErrorDeRed(f.e); });
+        toast('Se subieron ' + bien + ' de ' + lista.length + '. No se pudo: ' + fallas.map(function (f) { return f.nombre; }).join(', ') +
+          ' (' + (fallas[0].e && fallas[0].e.message || 'error') + ').' + (red ? ' Probá de nuevo con mejor señal.' : ''));
       }).then(function () { estado.subiendo = null; estado.progresoSubida = null; pantallaEncendida(false); return cargarAudios(); }).then(render);
     },
     'hoja-compartir': function () {
