@@ -1045,11 +1045,15 @@
   }
 
   function vZonaCuidado() {
-    var pend = pendientes().length;
+    var pend = pendientes().length, sinCopia = (estado.audios || []).filter(function (a) { return !a.copiado; }).length;
+    var hayAlgo = estado.registros.length || (estado.audios || []).length || estado.ajustes.clave;
+    // 1.8: el borrado es completo (relevamientos, grabaciones y clave del equipo), para devolver o liberar el celular
     return '<section class="tarjeta" style="border-color:var(--error)"><h2 class="seccion" style="color:var(--error)">Zona de cuidado</h2>' +
-      '<p>Borra todos los relevamientos de ESTE celular (por ejemplo, después de la práctica). Los que ya se enviaron siguen en la planilla.' +
-      (pend ? ' <b>Hay ' + pend + ' sin enviar</b>: si los borrás, antes se descarga un respaldo cifrado.' : '') + '</p>' +
-      '<button type="button" class="btn chico peligro" data-accion="borrar-todo"' + (estado.registros.length ? '' : ' disabled') + '>Borrar los datos de este celular</button></section>';
+      '<p>Borra de ESTE celular todos los relevamientos, todas las grabaciones y la clave del equipo (por ejemplo, después de la práctica o al terminar el trabajo de campo). ' +
+      'Lo que ya se envió sigue en la planilla y lo que se subió, en Drive. Si vas a seguir usando el celular, después cargá de nuevo la clave en Ajustes.' +
+      (pend ? ' <b>Hay ' + pend + ' sin enviar</b>: si los borrás, antes se descarga un respaldo cifrado.' : '') +
+      (sinCopia ? ' <b>Hay ' + sinCopia + (sinCopia === 1 ? ' grabación' : ' grabaciones') + ' sin copia</b>: subilas a Drive o pasalas a la PC antes de borrar.' : '') + '</p>' +
+      '<button type="button" class="btn chico peligro" data-accion="borrar-todo"' + (hayAlgo ? '' : ' disabled') + '>Borrar los datos de este celular</button></section>';
   }
 
   function vBitacora() {
@@ -1147,7 +1151,7 @@
       var r = estado.actual;
       imagenResultados(r).then(function (bl) {
         if (!bl) throw new Error('no se pudo armar la imagen');
-        return S.compartirODescargar('resultados_' + (r.codigo || 'sin-codigo') + '_' + r.fecha + '.png', bl, 'image/png', 'Resultados ' + (r.codigo || ''));
+        return S.compartirODescargar('resultados_' + idArchivo(r) + '_' + r.fecha + '.png', bl, 'image/png', 'Resultados ' + idArchivo(r));
       }).then(function (modo) { anotar('Imagen de resultados', (r.participante_id || 'sin ID') + ' · ' + modo); toast('Imagen de resultados lista'); },
         function (e) { if (!(e && e.name === 'AbortError')) toast('No se pudo guardar: ' + (e && e.message || 'error')); });
     },
@@ -1156,7 +1160,7 @@
       if (estado.subiendo || !puedeSubir()) return;
       estado.subiendo = 'resultados'; refrescar(); pantallaEncendida(true);
       imagenResultados(r).then(function (bl) {
-        return S.subirArchivo(aj.url, aj.clave, 'resultados', 'resultados_' + (r.codigo || 'sin-codigo') + '_' + r.fecha + '.png', bl);
+        return S.subirArchivo(aj.url, aj.clave, 'resultados', 'resultados_' + idArchivo(r) + '_' + r.fecha + '.png', bl);
       }).then(function (res) {
         // Se anota en el relevamiento sin cambiar su fecha de modificación (no hace falta volver a enviarlo a la planilla)
         r.drive = Object.assign({}, r.drive, { resultados: ahoraISO() });
@@ -1194,7 +1198,7 @@
       var r = estado.actual;
       imagenHoja(r).then(function (bl) {
         if (!bl) throw new Error('no se pudo armar la imagen');
-        return S.compartirODescargar('mediciones_' + (r.codigo || 'sin-codigo') + '_' + r.fecha + '.png', bl, 'image/png', 'Sus mediciones');
+        return S.compartirODescargar('mediciones_' + r.fecha + '.png', bl, 'image/png', 'Sus mediciones'); // 1.8: sin el código en el nombre
       }).then(function (modo) { anotar('Hoja del camionero', (r.participante_id || 'sin ID') + ' · ' + modo); },
         function (e) { if (!(e && e.name === 'AbortError')) toast('No se pudo compartir: ' + (e && e.message || 'error')); });
     },
@@ -1372,22 +1376,31 @@
     },
     'borrar-todo': function () {
       var aj = estado.ajustes, total = estado.registros.length, pend = pendientes().length;
-      if (!total) { toast('No hay relevamientos en este dispositivo'); return; }
+      var audios = estado.audios || [], sinCopia = audios.filter(function (a) { return !a.copiado; });
+      if (!total && !audios.length && !aj.clave) { toast('No hay nada para borrar en este dispositivo'); return; }
+      // 1.8: nunca se borra una grabación que no tenga copia (Drive o PC), ni durante una grabación
+      if (Gr.estado() !== 'inactivo') { toast('Hay una grabación en curso: detenela antes de borrar'); return; }
+      if (sinCopia.length) {
+        toast('No se borró nada: ' + sinCopia.length + (sinCopia.length === 1 ? ' grabación no tiene' : ' grabaciones no tienen') + ' copia. Subilas a Drive o pasalas a la PC desde «Grabaciones».');
+        return;
+      }
       var palabra = 'BORRAR';
       var aviso = pend ? 'ATENCIÓN: ' + pend + ' relevamientos NO se enviaron a la planilla. Si son datos reales, cancelá y sincronizá primero.\n' +
         'Si seguís, antes se descarga un respaldo cifrado.\n\n' : '';
-      var escrito = window.prompt(aviso + 'Se van a borrar ' + total + ' relevamientos de este dispositivo. Para confirmar, escribí ' + palabra);
+      var que = [total + ' relevamientos', audios.length + (audios.length === 1 ? ' grabación (ya copiada)' : ' grabaciones (ya copiadas)')].concat(aj.clave ? ['la clave del equipo'] : []).join(', ');
+      var escrito = window.prompt(aviso + 'Se van a borrar de este dispositivo: ' + que + '. Para confirmar, escribí ' + palabra);
       if (escrito === null) return;
       if (escrito.trim().toUpperCase() !== palabra) { toast('No se borró nada (no escribiste ' + palabra + ')'); return; }
       // Red de seguridad: si hay algo sin copia en la planilla, antes se descarga un respaldo cifrado.
       (pend && aj.clave ? respaldoCifrado() : Promise.resolve('')).then(function () {
-        return DB.borrarTodos();
+        // 1.8: relevamientos, grabaciones (terminadas y trozos) y, al final, la clave del equipo
+        return DB.borrarTodos().then(function () { return DB.borrarAudios(); }).then(function () { return DB.borrarTodasLasPartes(); });
       }).then(function () {
-        estado.registros = []; estado.actual = null;
-        aj.ultimaSync = ''; aj.ultimoPaquete = ''; aj.ultimaHuella = '';
-        anotar('Borrado total', total + ' relevamientos (' + pend + ' sin copia en la planilla)');
+        estado.registros = []; estado.actual = null; estado.audios = [];
+        aj.ultimaSync = ''; aj.ultimoPaquete = ''; aj.ultimaHuella = ''; aj.clave = '';
+        anotar('Borrado total', total + ' relevamientos (' + pend + ' sin copia en la planilla), ' + audios.length + ' grabaciones y la clave del equipo');
         return guardarAjustes();
-      }).then(function () { toast('Se borraron los datos de este dispositivo'); ir('#/jornada'); })
+      }).then(function () { toast('Se borraron los datos, las grabaciones y la clave de este dispositivo'); ir('#/jornada'); })
         .catch(function (e) { toast('No se borró nada: ' + e.message); });
     },
     'instalar': function () {
@@ -1545,7 +1558,7 @@
             : a.copiado ? '<span class="estado sinc">' + ico('check', 16) + 'Copiado a la PC</span>' : '<span class="estado pend"><span class="punto-pendiente"></span>Solo en el celular</span>') +
           '</span></div>';
       }).join('') + '</div>' : '<div class="vacio">Todavía no hay grabaciones.</div>') +
-      '<span class="ayuda">Cada audio lleva el código de su encuesta. Con señal, «Subir a Drive» los guarda directo en la carpeta «Grabaciones» del Drive del proyecto. «Pasar» los comparte o los guarda en este dispositivo. Lo que ya está en Drive o copiado se puede borrar del celular para liberar espacio.</span>' +
+      '<span class="ayuda">Cada audio se nombra con «rel-» y las primeras 8 cifras del id de su relevamiento (columna «id» de la planilla), sin datos de la persona. Con señal, «Subir a Drive» los guarda directo en la carpeta «Grabaciones» del Drive del proyecto. «Pasar» los comparte o los guarda en este dispositivo. Lo que ya está en Drive o copiado se puede borrar del celular para liberar espacio.</span>' +
       region('subidaAudios', REGIONES.subidaAudios()) +
       '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
       '<button type="button" class="btn primario" data-accion="audios-pasar"' + (sinCopiar.length ? '' : ' disabled') + '>' + ico('bajar', 22) + 'Pasar ' + sinCopiar.length + (sinCopiar.length === 1 ? ' audio' : ' audios') + '</button>' +
@@ -1568,7 +1581,10 @@
     return DB.audios().then(function (l) { estado.audios = (l || []).map(function (a) { return a; }); }).catch(function () { estado.audios = []; });
   }
 
-  function nombreAudio(r) { return (r && r.codigo ? r.codigo : 'sin-codigo-' + String(r ? r.id : '').slice(0, 8)) + '_' + (r ? r.fecha : hoy()); }
+  /* 1.8: los archivos que salen del celular (audios e imagen de resultados) se nombran con un identificador al azar:
+     las primeras 8 cifras del id del relevamiento (aleatorio, columna «id» de la planilla), sin orden, edad ni código postal. */
+  function idArchivo(r) { return 'rel-' + String(r && r.id ? r.id : '').replace(/[^0-9a-f]/gi, '').slice(0, 8).toLowerCase(); }
+  function nombreAudio(r) { return idArchivo(r) + '_' + (r ? r.fecha : hoy()); }
   Gr.nombrePara(function (regId) { return nombreAudio(estado.registros.find(function (x) { return x.id === regId; }) || estado.actual); });
   function detenerGrabacion(r) {
     return Gr.detener(nombreAudio(r)).then(function (a) {

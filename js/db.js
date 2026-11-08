@@ -56,6 +56,9 @@
     guardarAudio: function (a) { return operar('audios', 'readwrite', function (s) { return s.put(a); }); },
     audios: function () { return operar('audios', 'readonly', function (s) { return s.getAll(); }); },
     borrarAudio: function (nombre) { return operar('audios', 'readwrite', function (s) { return s.delete(nombre); }); },
+    // 1.8: borrado completo del celular (audios terminados y trozos de grabación)
+    borrarAudios: function () { return operar('audios', 'readwrite', function (s) { return s.clear(); }); },
+    borrarTodasLasPartes: function () { return operar('audio_partes', 'readwrite', function (s) { return s.clear(); }); },
     leerAjuste: function (clave) { return operar('ajustes', 'readonly', function (s) { return s.get(clave); }); },
     guardarAjuste: function (clave, valor) { return operar('ajustes', 'readwrite', function (s) { return s.put(valor, clave); }); }
   };
