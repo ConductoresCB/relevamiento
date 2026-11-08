@@ -88,10 +88,15 @@
       });
       var v = o.valor === 'n' ? it.n : it.pct, w = (xMax - x0) * v / tope;
       var tip = it.etiqueta + ': ' + num(it.n) + (o.valor === 'n' ? '' : ' (' + pct(it.pct) + ')');
-      cuerpo += '<rect x="' + x0 + '" y="' + (cy - h / 2 - 4) + '" width="' + (W - x0) + '" height="' + (h + 8) + '" fill="transparent" data-tip="' + esc(tip) + '"/>';
-      cuerpo += barraH(x0, cy - h / 2, Math.max(w, it.n ? 2 : 0), h, it.color || t.acento, tip);
+      // 1.7.2: una barra no seleccionada (hay un filtro en esta variable) se ve atenuada
+      var barra = barraH(x0, cy - h / 2, Math.max(w, it.n ? 2 : 0), h, it.color || t.acento, tip);
+      cuerpo += it.atenuada ? '<g opacity="0.32">' + barra + '</g>' : barra;
       var etq = o.valor === 'n' ? num(it.n) : num(it.n) + ' · ' + pct(it.pct);
-      cuerpo += texto(x0 + w + 8, cy + 4, etq, t, { color: it.n ? t.tinta : t.tenue, tam: 12, extra: ' font-variant-numeric="tabular-nums"' });
+      cuerpo += texto(x0 + w + 8, cy + 4, etq, t, { color: it.n && !it.atenuada ? t.tinta : t.tenue, tam: 12, extra: ' font-variant-numeric="tabular-nums"' });
+      // Zona sensible de toda la fila, encima de la barra: globo de ayuda y, si se puede, clic para filtrar (1.7.2)
+      var zona = it.filtro ? ' class="filtrable" role="button" tabindex="0" data-filtrar="' + esc(it.filtro.id) + '" data-valor="' + esc(it.filtro.valor) +
+        '" aria-label="' + esc('Ver solo «' + it.etiqueta + '» en todo el tablero') + '"' : '';
+      cuerpo += '<rect x="0" y="' + (cy - h / 2 - 4) + '" width="' + W + '" height="' + (h + 8) + '" fill="transparent"' + zona + ' data-tip="' + esc(tip + (it.filtro ? ' · tocá para filtrar' : '')) + '"/>';
       y += alto;
     });
     cuerpo = '<line x1="' + x0 + '" y1="2" x2="' + x0 + '" y2="' + (y + 2) + '" stroke="' + t.eje + '" stroke-width="1"/>' + cuerpo;

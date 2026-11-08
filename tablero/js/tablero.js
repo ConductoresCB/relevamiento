@@ -1,6 +1,7 @@
 /*
  * tablero.js — Interfaz del tablero de análisis.
- * Vistas: Resumen, Explorar, Cruces, Relaciones, Participantes, Informe y Fuentes.
+ * Vistas: Resumen, Explorar, Cruces, Perfil por riesgo, Relaciones, Participantes, Informe y Fuentes.
+ * 1.7.2: tocar una barra (o un tramo de la escala de riesgo) filtra todo el tablero, como en Power BI.
  * Todos los datos se procesan en este navegador: los archivos no se suben a ningún servidor.
  */
 (function () {
@@ -60,6 +61,7 @@
     filtros: { cat: {}, edad: [null, null], fecha: ['', ''] }, extraFiltros: [],
     explorar: { v: 'p01_nac_pais', por: '' },
     cruce: { f: 'p34_actividad_fisica', c: 'fr_categoria', mostrar: 'fila', num: 'b_imc' },
+    perfil: { test: 'fr_categoria', grupo: 'socio' },
     relacion: { x: 'p16_horas_sin_parar', y: 'b_imc', color: '', recta: true },
     participantes: { orden: 'completo', asc: true, buscar: '' },
     informe: [], conexion: { url: guardado.url || '', clave: guardado.clave || '', recordar: !!guardado.clave }
@@ -78,7 +80,12 @@
       el.innerHTML = dibujarEn(g, t, w).svg;
     });
   }
-  var FILTROS_FIJOS = ['origen', 'puesto', 'equipo', 'b_sexo', 'p01_nac_pais'];
+  // 1.7.2: «Encuestador/a» (nombres) reemplaza a «Equipo» (letra); la letra con el nombre está en Más filtros › Dispositivo.
+  var FILTROS_FIJOS = ['origen', 'puesto', 'encuestador_persona', 'b_sexo', 'p01_nac_pais'];
+  var FILTROS_RIESGO = ['fr_categoria', 'fh_categoria']; // 1.7.2: a la vista, para cruzar todo por resultado del test
+  var NOMBRE_FILTRO = { origen: 'Planilla', puesto: 'Punto', encuestador_persona: 'Encuestador/a', b_sexo: 'Sexo', p01_nac_pais: 'País de nacimiento',
+    fr_categoria: 'Riesgo FINDRISK', fh_categoria: 'Riesgo Framingham' };
+  function esFijo(id) { return FILTROS_FIJOS.indexOf(id) >= 0 || FILTROS_RIESGO.indexOf(id) >= 0; }
 
   function leerPreferencias() {
     try { return JSON.parse(localStorage.getItem('tablero-relevamiento') || '{}'); } catch (e) { return {}; }
@@ -105,6 +112,29 @@
   function aplicar() {
     cache.filtradas = D.filtrar(conjunto(), estado.filtros);
     render();
+  }
+
+  /* ---------- Filtro cruzado (1.7.2) ----------
+     El gráfico de una variable filtrada se dibuja con todos los filtros menos el suyo: así se siguen viendo todas
+     sus barras y la elegida queda resaltada (las demás, atenuadas). El resto del tablero muestra solo lo elegido. */
+  function seleccion(id) { return estado.filtros.cat[id] || []; }
+  function filtrosSin(id) {
+    var f = { cat: {}, edad: estado.filtros.edad, fecha: estado.filtros.fecha };
+    Object.keys(estado.filtros.cat).forEach(function (k) { if (k !== id) f.cat[k] = estado.filtros.cat[k]; });
+    return f;
+  }
+  function filasSin(id) { return seleccion(id).length ? D.filtrar(conjunto(), filtrosSin(id)) : cache.filtradas; }
+  /* Toque simple: solo esa categoría (o se quita si ya era la única). Con Ctrl, Cmd o Mayús: se suma o se saca. */
+  function filtrarPor(id, valor, sumar) {
+    var sel = seleccion(id).slice(), i = sel.indexOf(valor);
+    if (sumar) { if (i >= 0) sel.splice(i, 1); else sel.push(valor); }
+    else sel = sel.length === 1 && i === 0 ? [] : [valor];
+    if (sel.length) estado.filtros.cat[id] = sel; else delete estado.filtros.cat[id];
+    if (sel.length && !esFijo(id) && estado.extraFiltros.indexOf(id) < 0) estado.extraFiltros.push(id);
+    aplicar();
+    var v = D.variable(id), nom = NOMBRE_FILTRO[id] || (v ? v.nombre : id);
+    aviso(sel.length ? nom + ': ' + sel.join(', ') + ' · ' + num(cache.filtradas.length) + ' ' + nombreUnidad(cache.filtradas.length) + '. Todo el tablero muestra solo ese grupo; tocá de nuevo para quitarlo.'
+      : 'Se quitó el filtro de ' + nom + '.');
   }
 
   function agregarFuente(nombre, etiqueta, filasCrudas, extra) {
@@ -325,6 +355,8 @@
   /* Gráfico de frecuencias de una variable categórica */
   function graficoFrecuencias(id, v, filas, opciones) {
     opciones = opciones || {};
+    var filtrable = opciones.filtrable !== false && (v.tipo === 'categorica' || v.tipo === 'multiple'), sel = filtrable ? seleccion(v.id) : [];
+    if (sel.length) filas = filasSin(v.id); // se ven todas las barras; la elegida, resaltada
     var f = D.frecuencias(filas, v);
     var cats = f.categorias;
     var titulo = opciones.titulo || v.nombre;
@@ -333,11 +365,18 @@
       tabla: { cabecera: [opciones.encabezado || 'Respuesta', 'Cantidad', '% sobre quienes respondieron'],
         filas: cats.map(function (c) { return [c.valor, num(c.n), num(c.pct, 1)]; }).concat([{ total: true, celdas: ['Respondieron', num(f.respondieron), ''] }]) } };
     if (!f.respondieron) g.vacio = opciones.vacio || 'Sin datos con los filtros actuales.';
+    if (sel.length) {
+      g.subtitulo += ' · seleccionado: ' + sel.join(', ');
+      if (g.lectura) g.lectura = '<strong>Seleccionado: ' + esc(sel.join(', ')) + '.</strong> El resto del tablero muestra solo ese grupo; tocá la barra de nuevo (o «Quitar filtros») para volver a ver todo. ' + g.lectura;
+    }
     if (opciones.extra && f.respondieron) g.extra = opciones.extra(f);
     g.dibujar = function (t) {
       var col = coloresDe(v, cats.map(function (c) { return c.valor; }), t);
       var unico = !(v.riesgo || v.ordinal);
-      return G.barrasH(cats.map(function (c, i) { return { etiqueta: c.valor, n: c.n, pct: c.pct, color: unico ? t.acento : col[i] }; }), t, { ancho: anchoActual, titulo: titulo });
+      return G.barrasH(cats.map(function (c, i) {
+        return { etiqueta: c.valor, n: c.n, pct: c.pct, color: unico ? t.acento : col[i],
+          filtro: filtrable && c.n ? { id: v.id, valor: c.valor } : null, atenuada: sel.length > 0 && sel.indexOf(c.valor) < 0 };
+      }), t, { ancho: anchoActual, titulo: titulo });
     };
     return g;
   }
@@ -347,6 +386,7 @@
     resumen: { titulo: 'Resumen', bajada: 'Cuántos hay, qué riesgos aparecen y qué datos faltan.' },
     explorar: { titulo: 'Explorar una pregunta', bajada: 'Elegí una pregunta para ver su distribución y, si querés, compararla entre grupos.' },
     cruces: { titulo: 'Cruces', bajada: 'Tabla dinámica entre dos preguntas: por ejemplo, un hábito de la sociodemográfica contra un riesgo de la biológica.' },
+    perfil: { titulo: 'Perfil por riesgo', bajada: 'Cómo son los camioneros de cada nivel de riesgo: las variables en filas y los niveles de FINDRISK o Framingham en columnas.' },
     relaciones: { titulo: 'Relaciones numéricas', bajada: 'Dos medidas numéricas a la vez, con su correlación.' },
     participantes: { titulo: 'Participantes', bajada: 'Cada participante con sus visitas unidas por ID y lo que todavía falta completar.' },
     informe: { titulo: 'Informe', bajada: 'Los gráficos que agregaste, con su lectura y tus notas, listos para descargar.' },
@@ -365,7 +405,7 @@
     renderFuentesMini();
     var html = '';
     if (!estado.fuentes.length && estado.vista !== 'fuentes') html = vSinDatos();
-    else html = ({ resumen: vResumen, explorar: vExplorar, cruces: vCruces, relaciones: vRelaciones, participantes: vParticipantes, informe: vInforme, fuentes: vFuentes })[estado.vista]();
+    else html = ({ resumen: vResumen, explorar: vExplorar, cruces: vCruces, perfil: vPerfil, relaciones: vRelaciones, participantes: vParticipantes, informe: vInforme, fuentes: vFuentes })[estado.vista]();
     $('#vista').innerHTML = html;
     dibujarLienzos();
   }
@@ -416,23 +456,28 @@
   /* 1.7: la misma escala de colores que ve el encuestador en Resultados (app), con cuántos hay en cada tramo.
      El tramo con más personas lleva un borde. Los rótulos van en texto (no se depende solo del color). */
   var ESCALAS = {
-    fr: { colores: ['--r1', '--r2', '--r3', '--r4', '--r5'], rangos: ['0–6 pts', '7–11 pts', '12–14 pts', '15–20 pts', '21–26 pts'],
+    fr: { id: 'fr_categoria', colores: ['--r1', '--r2', '--r3', '--r4', '--r5'], rangos: ['0–6 pts', '7–11 pts', '12–14 pts', '15–20 pts', '21–26 pts'],
       cats: ['Bajo', 'Ligeramente elevado', 'Moderado', 'Alto', 'Muy alto'] },
-    fh: { colores: ['--r1', '--r3', '--r5'], rangos: ['menos de 10 %', '10–19 %', '20 % o más'], cats: ['Bajo', 'Moderado', 'Alto'] }
+    fh: { id: 'fh_categoria', colores: ['--r1', '--r3', '--r5'], rangos: ['menos de 10 %', '10–19 %', '20 % o más'], cats: ['Bajo', 'Moderado', 'Alto'] }
   };
   function escalaApp(clave) {
     var e = ESCALAS[clave];
     return function (f) {
       var por = {};
       f.categorias.forEach(function (c) { por[c.valor] = c; });
-      var max = Math.max.apply(null, e.cats.map(function (c) { return (por[c] || {}).n || 0; }));
+      var max = Math.max.apply(null, e.cats.map(function (c) { return (por[c] || {}).n || 0; })), sel = seleccion(e.id);
+      // 1.7.2: cada tramo es un botón que filtra todo el tablero por ese nivel de riesgo
       return '<div class="escala-app"><p class="titulo-escala">Escala de la app (pantalla Resultados) · cuántos hay en cada tramo</p>' +
         '<div class="tramos" style="grid-template-columns:repeat(' + e.cats.length + ',minmax(0,1fr))">' + e.cats.map(function (c, i) {
-          var x = por[c] || { n: 0, pct: 0 };
-          return '<div class="tramo' + (x.n && x.n === max ? ' mayor' : '') + '"><span class="color" style="background:var(' + e.colores[i] + ')"></span>' +
+          var x = por[c] || { n: 0, pct: 0 }, elegido = sel.indexOf(c) >= 0;
+          var cls = 'tramo' + (x.n && x.n === max ? ' mayor' : '') + (elegido ? ' elegido' : sel.length ? ' atenuado' : '');
+          var contenido = '<span class="color" style="background:var(' + e.colores[i] + ')"></span>' +
             '<span class="rango">' + esc(e.rangos[i]) + '</span><span class="cat">' + esc(c) + '</span>' +
-            '<span class="cifra"><b>' + num(x.n) + '</b> · ' + num(x.pct, 0) + ' %</span></div>';
-        }).join('') + '</div></div>';
+            '<span class="cifra"><b>' + num(x.n) + '</b> · ' + num(x.pct, 0) + ' %</span>';
+          return x.n ? '<button type="button" class="' + cls + '" data-filtrar="' + e.id + '" data-valor="' + esc(c) + '" aria-pressed="' + elegido + '" title="Ver solo «' + esc(c) + '» en todo el tablero">' + contenido + '</button>'
+            : '<div class="' + cls + '">' + contenido + '</div>';
+        }).join('') + '</div>' +
+        '<p class="pista-filtro">Tocá una barra o un tramo para ver solo ese grupo en todo el tablero (Explorar, Cruces, Perfil por riesgo, Participantes). Con Ctrl tocás varios. Para comparar todos los niveles a la vez, usá <button type="button" class="enlace" data-ir="perfil">Perfil por riesgo</button>.</p></div>';
     };
   }
 
@@ -506,7 +551,9 @@
     var html = '<div class="tarjeta"><div class="controles">' +
       '<label class="campo"><span>Pregunta o medición</span><select class="entrada" data-campo="explorar.v">' + opcionesVariables(['categorica', 'multiple', 'numerica'], v.id) + '</select></label>' +
       '<label class="campo"><span>Comparar entre grupos de</span><select class="entrada" data-campo="explorar.por">' + opcionesVariables(['categorica', 'multiple'], ex.por, 'Sin comparar (todos juntos)') + '</select></label>' +
-      '</div><p class="sub">' + esc(v.texto) + '</p></div>';
+      '</div><p class="sub">' + esc(v.texto) + '</p>' +
+      '<div class="chips"><span class="sub">Comparar por resultado del test:</span>' + [['fr_categoria', 'Riesgo FINDRISK'], ['fh_categoria', 'Riesgo Framingham'], ['', 'Sin comparar']].map(function (o) {
+        return '<button type="button" class="chip' + (ex.por === o[0] ? ' activo' : '') + '" data-accion="comparar-por" data-v="' + o[0] + '"' + (o[0] === v.id ? ' disabled' : '') + '>' + o[1] + '</button>'; }).join('') + '</div></div>';
     var g;
     if (v.tipo === 'numerica') g = por ? graficoMediasPor(v, por, F) : graficoHistograma(v, F);
     else g = por ? graficoComparado(v, por, F) : graficoFrecuencias('exp', v, F);
@@ -652,6 +699,154 @@
     return html;
   }
 
+  /* ---------- Perfil por riesgo (1.7.2) ----------
+     Tabla tipo «Tabla 1» de un artículo: cada variable en filas y los niveles de un test en columnas.
+     Categorías: n (% de la columna) y chi cuadrado (Fisher en 2 × 2). Medidas: media (DE), mediana [RIC] y Kruskal-Wallis.
+     Ignora el filtro de su propio test (para poder comparar los niveles) y respeta todos los demás. */
+  var COMPONENTES = { // variables que entran en el cálculo de cada test: su diferencia entre niveles es esperable
+    fr_categoria: ['edad', 'grupo_edad', 'b_sexo', 'b_peso_kg', 'b_altura_m', 'b_imc', 'imc_cat', 'imc_mayor25', 'b_perimetro_cm', 'b_act_fisica',
+      'b_fyv_diario', 'b_med_antihta', 'b_glucosa_previa', 'b_antec_fam_dbt', 'b_dbt_dx'],
+    fh_categoria: ['edad', 'grupo_edad', 'b_sexo', 'b_peso_kg', 'b_altura_m', 'b_imc', 'imc_cat', 'imc_mayor25', 'b_pas_mmhg', 'pas_140',
+      'b_med_antihta', 'b_fuma', 'b_dbt_dx']
+  };
+  function gruposPerfil() {
+    var dic = D.diccionario(), secs = (window.Instrumento && window.Instrumento.CUESTIONARIO.secciones) || [];
+    function apto(v) {
+      return v && ['categorica', 'multiple', 'numerica'].indexOf(v.tipo) >= 0 && !v.riesgo && !/^f[rh]_/.test(v.id) &&
+        !/_otro$|_detalle$|_cuales|_lic_/.test(v.id) && ['visitas', 'socio_respondidas', 'estado'].indexOf(v.id) < 0;
+    }
+    function deSeccion(t) { return dic.filter(function (v) { return v.seccion === t && apto(v); }).map(function (v) { return v.id; }); }
+    function deSec(s) { // preguntas de la sección + las biológicas intercaladas en ella (p. ej. «Fuma tabaco» en Consumos)
+      var ids = deSeccion(s.titulo);
+      s.preguntas.forEach(function (p) { if (p.bio && apto(D.variable(p.bio)) && ids.indexOf(p.bio) < 0) ids.push(p.bio); });
+      return ids;
+    }
+    var socio = secs.filter(function (s) { return s.bloque === 'Sociodemográfica'; });
+    var lista = [{ id: 'socio', titulo: 'Sociodemográfica completa (edad y sus ' + socio.length + ' secciones)',
+      vars: ['edad'].concat([].concat.apply([], socio.map(deSec))) }];
+    secs.forEach(function (s) { lista.push({ id: s.id, titulo: s.bloque + ' · ' + s.titulo, vars: deSec(s) }); });
+    lista.push({ id: 'bio', titulo: 'Biológica · mediciones y antecedentes', vars: deSeccion('Biológica') });
+    lista.push({ id: 'derivadas', titulo: 'Variables agrupadas (edad, IMC, años como chofer, horas)', vars: deSeccion('Variables derivadas') });
+    lista.push({ id: 'relevamiento', titulo: 'Relevamiento (punto, encuestador/a, dispositivo, planilla)', vars: deSeccion('Relevamiento').filter(function (id) { return id !== 'edad'; }) });
+    return lista.filter(function (g) { return g.vars.length; });
+  }
+  function pCorto(p) { return p === null || p === undefined || isNaN(p) ? '—' : p < 0.001 ? '< 0,001' : num(p, 3); }
+
+  function calcularPerfil(vt, filas, ids) {
+    var cats = D.frecuencias(filas, vt).categorias.filter(function (c) { return c.n > 0; }).map(function (c) { return c.valor; });
+    var grupos = cats.map(function (c) { return filas.filter(function (r) { return D.valores(r, vt).indexOf(c) >= 0; }); });
+    var bloques = [], sinDatos = [];
+    ids.forEach(function (id) {
+      var v = D.variable(id); if (!v) return;
+      if (v.tipo === 'numerica') {
+        var tot = E.resumen(D.numeros(filas, v));
+        if (!tot.n) { sinDatos.push(v.etiqueta); return; }
+        var res = grupos.map(function (g) { return E.resumen(D.numeros(g, v)); });
+        var kw = E.kruskalWallis(grupos.map(function (g) { return D.numeros(g, v); }));
+        var u = unidadDe(v);
+        bloques.push({ v: v, numerica: true, p: kw ? kw.p : null, prueba: kw ? 'Kruskal-Wallis H(' + kw.gl + ') = ' + num(kw.H, 2) : '', filas: [
+          { etiqueta: 'Media (DE)' + (u ? ' · ' + u : ''), celdas: res.map(function (r) { return r.n ? num(r.media, 1) + (r.de !== null ? ' (' + num(r.de, 1) + ')' : '') : '—'; }), total: num(tot.media, 1) + (tot.de !== null ? ' (' + num(tot.de, 1) + ')' : '') },
+          { etiqueta: 'Mediana [RIC]', celdas: res.map(function (r) { return r.n ? num(r.mediana, 1) + ' [' + num(r.q1, 1) + '–' + num(r.q3, 1) + ']' : '—'; }), total: num(tot.mediana, 1) + ' [' + num(tot.q1, 1) + '–' + num(tot.q3, 1) + ']' },
+          { etiqueta: 'Con dato', celdas: res.map(function (r) { return num(r.n); }), total: num(tot.n), tenue: true }] });
+        return;
+      }
+      var x = D.cruce(filas, v, vt, { maxColumnas: 8, ocultarVacias: true });
+      if (!x.N) { sinDatos.push(v.etiqueta); return; }
+      var jDe = cats.map(function (c) { return x.columnas.indexOf(c); });
+      var b = { v: v, multiple: !x.simple, p: null, cuidado: false, prueba: '', filas: [] };
+      x.filas.forEach(function (f, i) {
+        if (!x.totFila[i]) return;
+        var pcts = jDe.map(function (j) { return j >= 0 && x.totCol[j] ? x.tabla[i][j] / x.totCol[j] * 100 : null; });
+        b.filas.push({ etiqueta: f, pcts: pcts, celdas: jDe.map(function (j, k) { return j >= 0 && x.totCol[j] ? num(x.tabla[i][j]) + ' (' + num(pcts[k], 1) + ' %)' : '—'; }),
+          total: num(x.totFila[i]) + ' (' + num(x.totFila[i] / x.N * 100, 1) + ' %)' });
+      });
+      b.filas.push({ etiqueta: 'Respondieron', celdas: jDe.map(function (j) { return j >= 0 ? num(x.totCol[j]) : '0'; }), total: num(x.N), tenue: true });
+      if (x.simple) {
+        var t = x.tabla.filter(function (f, i) { return x.totFila[i] > 0; }).map(function (f) { return f.filter(function (c, j) { return x.totCol[j] > 0; }); });
+        if (t.length >= 2 && t[0].length >= 2) {
+          var chi = E.chiCuadrado(t);
+          if (t.length === 2 && t[0].length === 2) { b.p = E.fisher2x2(t[0][0], t[0][1], t[1][0], t[1][1]); b.prueba = 'Fisher (2 × 2)'; }
+          else { b.p = chi.p; b.prueba = 'χ²(' + chi.gl + ') = ' + num(chi.chi2, 2); b.cuidado = chi.propBajas > 0.2; }
+        }
+      }
+      bloques.push(b);
+    });
+    return { cats: cats, ns: grupos.map(function (g) { return g.length; }), N: filas.length, bloques: bloques, sinDatos: sinDatos };
+  }
+
+  function tablaPerfil(R, vt, interactivo) {
+    var t = paletaPantalla(), col = coloresDe(vt, R.cats, t), sel = seleccion(vt.id), comp = COMPONENTES[vt.id] || [];
+    var ncol = R.cats.length + 2;
+    var html = '<table class="datos perfil"><thead><tr><th>Variable</th>' + R.cats.map(function (c, j) {
+      var rot = '<span class="punto-riesgo" style="background:' + col[j] + '"></span>' + esc(c) + '<span class="n-col">n = ' + num(R.ns[j]) + '</span>';
+      return '<th class="n nivel' + (sel.indexOf(c) >= 0 ? ' elegido' : '') + '">' + (interactivo ? '<button type="button" data-filtrar="' + vt.id + '" data-valor="' + esc(c) + '" title="Ver solo «' + esc(c) + '» en todo el tablero">' + rot + '</button>' : rot) + '</th>';
+    }).join('') + '<th class="n">Total<span class="n-col">n = ' + num(R.N) + '</span></th><th class="n">p</th></tr></thead><tbody>';
+    R.bloques.forEach(function (b) {
+      var nombre = esc(b.v.etiqueta), marca = comp.indexOf(b.v.id) >= 0 ? ' <span class="etiqueta-comp" title="Entra en el cálculo del test">en el puntaje</span>' : '';
+      var pTxt = b.multiple ? '<span title="Opción múltiple: cada persona puede estar en varias filas; mirá cada opción en Cruces">—</span>' :
+        '<span title="' + esc(b.prueba) + '"' + (b.p !== null && b.p < 0.05 ? ' class="p-baja"' : '') + '>' + pCorto(b.p) + (b.cuidado ? '*' : '') + '</span>';
+      html += '<tr class="var"><th colspan="' + ncol + '" scope="rowgroup">' + (interactivo ? '<button type="button" class="enlace" data-accion="perfil-ver" data-v="' + b.v.id + '" title="Ver en ' + (b.numerica ? 'Explorar' : 'Cruces') + '">' + nombre + '</button>' : nombre) +
+        marca + (b.multiple ? ' <span class="etiqueta-comp gris">varias opciones</span>' : '') + '</th><td class="n">' + pTxt + '</td></tr>';
+      var maxPct = Math.max.apply(null, [1e-9].concat([].concat.apply([], b.filas.map(function (f) { return (f.pcts || []).filter(function (x) { return x !== null; }); }))));
+      b.filas.forEach(function (f) {
+        html += '<tr' + (f.tenue ? ' class="tenue"' : '') + '><td class="cat">' + esc(f.etiqueta) + '</td>' + f.celdas.map(function (c, j) {
+          var a = f.pcts && f.pcts[j] !== null ? f.pcts[j] / maxPct : 0;
+          return '<td class="n' + (sel.indexOf(R.cats[j]) >= 0 ? ' elegido' : '') + '"' + (a ? ' style="background:color-mix(in srgb, var(--g-acento) ' + Math.round(a * 34) + '%, transparent)"' : '') + '>' + c + '</td>';
+        }).join('') + '<td class="n">' + f.total + '</td><td></td></tr>';
+      });
+    });
+    return html + '</tbody></table>';
+  }
+
+  function vPerfil() {
+    var pf = estado.perfil, vt = D.variable(pf.test) || D.variable('fr_categoria');
+    var grupos = gruposPerfil(), gr = grupos.filter(function (g) { return g.id === pf.grupo; })[0] || grupos[0];
+    var base = filasSin(vt.id), filas = base.filter(function (r) { return D.tieneDato(r, vt); }), sinTest = base.length - filas.length;
+    var html = '<div class="tarjeta"><div class="controles">' +
+      '<div class="campo" style="flex:0 1 auto"><span>Test</span><div class="segmentado" role="group" aria-label="Test">' +
+      [['fr_categoria', 'FINDRISK (diabetes)'], ['fh_categoria', 'Framingham (cardiovascular)']].map(function (o) {
+        return '<button type="button" data-accion="perfil-test" data-v="' + o[0] + '" aria-pressed="' + (vt.id === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div></div>' +
+      '<label class="campo"><span>Variables</span><select class="entrada" data-campo="perfil.grupo">' + grupos.map(function (g) {
+        return '<option value="' + g.id + '"' + (g.id === gr.id ? ' selected' : '') + '>' + esc(g.titulo) + '</option>'; }).join('') + '</select></label></div>' +
+      '<p class="sub">Tocá un nivel (encabezado de columna) para ver solo ese grupo en todo el tablero; tocá una variable para abrirla en Cruces o en Explorar.</p></div>';
+    if (!filas.length) return html + '<div class="vacio">Ningún ' + nombreUnidad(1) + ' tiene ' + esc(vt.nombre) + ' calculado con los filtros actuales.</div>';
+    var R = calcularPerfil(vt, filas, gr.vars), sel = seleccion(vt.id);
+    var chicos = R.cats.filter(function (c, j) { return R.ns[j] < 10; });
+    var hayComp = R.bloques.some(function (b) { return (COMPONENTES[vt.id] || []).indexOf(b.v.id) >= 0; });
+    var conP = R.bloques.filter(function (b) { return b.p !== null; }).length;
+    var titulo = 'Perfil según ' + minus(vt.nombre) + ' · ' + gr.titulo;
+    var sub = num(R.N) + ' ' + nombreUnidad(R.N) + ' con ' + vt.nombre + ' calculado' + (sinTest ? ' · ' + num(sinTest) + ' sin ' + vt.nombre + ' no entran' : '');
+    var lectura = 'Los porcentajes son <strong>por columna</strong>: dentro de cada nivel de riesgo, qué proporción tiene cada característica (sobre quienes respondieron esa pregunta). ' +
+      'p: chi cuadrado (prueba exacta de Fisher en tablas 2 × 2) para categorías y Kruskal-Wallis para medidas numéricas' +
+      (R.bloques.some(function (b) { return b.cuidado; }) ? '; * más del 20 % de las celdas con frecuencia esperada menor que 5, tomalo como orientativo' : '') + '. ' +
+      (hayComp ? '«En el puntaje»: la variable entra en el cálculo del test, así que es esperable que cambie entre niveles. ' : '') +
+      (chicos.length ? 'Niveles con menos de 10 casos (' + chicos.map(esc).join(', ') + '): sus porcentajes cambian mucho con cada caso. ' : '') +
+      (conP > 5 ? 'Con ' + conP + ' pruebas a la vez, alguna puede dar p < 0,05 por azar: usalo para explorar y confirmalo con un análisis planificado. ' : '') +
+      'Una asociación no indica causa.' + (R.sinDatos.length ? ' Sin datos con los filtros actuales: ' + R.sinDatos.map(esc).join(', ') + '.' : '');
+    var filtrosOtros = descripcionFiltros();
+    html += '<article class="tarjeta" id="g-perfil"><header><h3>' + esc(titulo) + '</h3><p class="sub">' + esc(sub) + (sel.length ? ' · seleccionado en el resto del tablero: ' + esc(sel.join(', ')) : '') + '</p></header>' +
+      '<p class="lectura">' + lectura + '</p><div class="desplazable">' + tablaPerfil(R, vt, true) + '</div>' +
+      '<footer class="acciones no-imprimir"><button type="button" class="btn chico fantasma" data-accion="perfil-csv">Tabla CSV</button>' +
+      '<button type="button" class="btn chico fantasma" data-accion="perfil-informe">Agregar al informe</button></footer></article>';
+    // para CSV e informe
+    var cab = ['Variable', 'Fila'].concat(R.cats.map(function (c, j) { return c + ' (n = ' + R.ns[j] + ')'; })).concat(['Total (n = ' + R.N + ')', 'p', 'Prueba']);
+    var filasCsv = [];
+    R.bloques.forEach(function (b) {
+      b.filas.forEach(function (f, i) {
+        filasCsv.push([b.v.etiqueta, f.etiqueta].concat(f.celdas).concat([f.total, i === 0 ? (b.multiple ? 'opción múltiple' : pCorto(b.p) + (b.cuidado ? '*' : '')) : '', i === 0 ? b.prueba : '']));
+      });
+    });
+    var pie = pieExportacion().replace(filtrosOtros ? 'Filtros: ' + filtrosOtros + '. ' : '', filtrosOtros ? 'Filtros: ' + descripcionFiltrosSin(vt.id) + '. ' : '');
+    graficos._perfil = { titulo: titulo, tabla: { cabecera: cab, filas: filasCsv },
+      informe: '<div class="tabla-informe"><h3>' + esc(titulo) + '</h3><p class="sub">' + esc(sub) + '</p>' + tablaPerfil(R, vt, false) + '<p class="sub">' + esc(pie) + '</p></div>',
+      lecturaInforme: lectura };
+    return html;
+  }
+  function descripcionFiltrosSin(id) { // los filtros que se aplicaron a la tabla (todos menos el del propio test)
+    var guardados = estado.filtros; estado.filtros = filtrosSin(id);
+    try { return descripcionFiltros() || 'ninguno'; } finally { estado.filtros = guardados; }
+  }
+
   /* ---------- Relaciones ---------- */
   var SUGERENCIAS_REL = [['p16_horas_sin_parar', 'b_imc', 'Horas sin parar × IMC'], ['edad', 'b_pas_mmhg', 'Edad × presión sistólica'],
     ['b_imc', 'b_perimetro_cm', 'IMC × perímetro abdominal'], ['b_imc', 'g_resultado_mgdl', 'IMC × glucemia'], ['p19_horas_sueno', 'b_pas_mmhg', 'Horas de sueño × presión'],
@@ -780,7 +975,8 @@
     return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Informe · Relevamiento Corredor Bioceánico</title>' +
       '<style>body{font-family:Arial,Helvetica,sans-serif;color:#1C1E21;max-width:860px;margin:32px auto;padding:0 20px;line-height:1.45}h1{font-size:26px;margin:0 0 4px}' +
       '.alcance{color:#4A4E54;font-size:14px;border-bottom:1px solid #DCD6C8;padding-bottom:14px}section{margin:28px 0;break-inside:avoid}.img svg{width:100%;height:auto}' +
-      'p{font-size:14px;color:#4A4E54}.nota{color:#1C1E21;border-left:3px solid #1A588F;padding-left:10px}</style></head><body>' +
+      'p{font-size:14px;color:#4A4E54}.nota{color:#1C1E21;border-left:3px solid #1A588F;padding-left:10px}' +
+      'table{border-collapse:collapse;font-size:12px;width:100%}th,td{border-bottom:1px solid #E6E1D5;padding:3px 6px;text-align:left;vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap}tr.var th{background:#F4F1EA;padding-top:6px}h3{margin:0 0 4px;font-size:17px}</style></head><body>' +
       '<h1>Relevamiento Corredor Bioceánico · Jujuy</h1><p class="alcance">' + esc(pieExportacion()) + '</p>' + cuerpo + '</body></html>';
   }
 
@@ -823,7 +1019,8 @@
       '<li>Cada relevamiento tiene un <strong>id</strong> único: si aparece en dos planillas, cuenta una sola vez.</li>' +
       '<li>Las visitas de una misma persona se unen por su <strong>ID de participante</strong> (por ejemplo P1-0014): en la vista por participantes, cada dato toma el valor más reciente que no esté vacío.</li>' +
       '<li>FINDRISK, Framingham e IMC se recalculan con las mismas fórmulas de la app, usando los datos unidos.</li>' +
-      '<li>Variables agregadas para analizar: grupo de edad, IMC según OMS, presión ≥ 140, años como chofer, horas sin parar y horas de sueño agrupadas.</li></ul></div>';
+      '<li>Variables agregadas para analizar: grupo de edad, IMC según OMS, presión ≥ 140, años como chofer, horas sin parar y horas de sueño agrupadas.</li>' +
+      '<li><strong>Encuestador/a</strong> sale de lo que se escribió en cada entrevista; si fueron varios («Ana y Luis»), cuenta para cada uno. El mismo nombre con o sin tilde o mayúsculas se une. <strong>Dispositivo</strong> (en Más filtros) muestra la letra y el número con el nombre de quien más lo usó, por ejemplo «J1 · Ana».</li></ul></div>';
     return html;
   }
 
@@ -834,7 +1031,7 @@
     var set = conjunto(), html = '<div class="segmentado" role="group" aria-label="Unidad de análisis">' +
       '<button type="button" data-unidad="participantes" aria-pressed="' + (estado.unidad === 'participantes') + '">Participantes</button>' +
       '<button type="button" data-unidad="relevamientos" aria-pressed="' + (estado.unidad === 'relevamientos') + '">Relevamientos</button></div>';
-    FILTROS_FIJOS.concat(estado.extraFiltros).forEach(function (id) { html += filtroCategorico(id, set); });
+    FILTROS_FIJOS.forEach(function (id) { html += filtroCategorico(id, set); });
     var e = estado.filtros.edad, f = estado.filtros.fecha;
     var edadActiva = e[0] !== null || e[1] !== null, fechaActiva = !!(f[0] || f[1]);
     html += '<details class="filtro' + (edadActiva ? ' activo' : '') + '" data-filtro="edad"><summary>Edad' + (edadActiva ? ' <span class="cuenta">' + (e[0] !== null ? e[0] : '') + '–' + (e[1] !== null ? e[1] : '') + '</span>' : '') + '</summary><div class="menu">' +
@@ -843,6 +1040,7 @@
     html += '<details class="filtro' + (fechaActiva ? ' activo' : '') + '" data-filtro="fecha"><summary>Período' + (fechaActiva ? ' <span class="cuenta">sí</span>' : '') + '</summary><div class="menu">' +
       '<div class="rango"><input type="date" data-rango="fecha.0" value="' + f[0] + '" aria-label="Desde"><input type="date" data-rango="fecha.1" value="' + f[1] + '" aria-label="Hasta"></div>' +
       '<div class="pie-menu"><button type="button" class="btn chico fantasma" data-accion="limpiar-rango" data-rango="fecha">Limpiar</button><button type="button" class="btn chico" data-accion="cerrar-menu">Listo</button></div></div></details>';
+    FILTROS_RIESGO.concat(estado.extraFiltros).forEach(function (id) { html += filtroCategorico(id, set); });
     html += '<details class="filtro" data-filtro="mas"><summary>Más filtros</summary><div class="menu"><label class="campo" style="max-width:none"><span>Filtrar también por</span><select class="entrada" data-accion-cambio="agregar-filtro">' +
       opcionesVariables(['categorica', 'multiple'], '', 'Elegí una pregunta…') + '</select></label></div></details>';
     var desc = descripcionFiltros();
@@ -859,11 +1057,13 @@
     var cats = f.categorias.filter(function (c) { return c.n > 0; });
     if (f.sinDato) cats.push({ valor: D.SIN_DATO, n: f.sinDato });
     if (!cats.length) return '';
-    var nombre = { origen: 'Planilla', puesto: 'Punto', equipo: 'Equipo', b_sexo: 'Sexo', p01_nac_pais: 'País de nacimiento' }[id] || v.nombre;
-    return '<details class="filtro' + (sel.length ? ' activo' : '') + '" data-filtro="' + id + '"><summary>' + esc(nombre) + (sel.length ? ' <span class="cuenta">' + sel.length + '</span>' : '') + '</summary><div class="menu">' +
-      cats.map(function (c) { return '<label><input type="checkbox" data-filtro-cat="' + id + '" value="' + esc(c.valor) + '"' + (sel.indexOf(c.valor) >= 0 ? ' checked' : '') + '><span>' + esc(c.valor) + '</span><span class="n">' + num(c.n) + '</span></label>'; }).join('') +
+    var nombre = NOMBRE_FILTRO[id] || v.nombre;
+    var colores = v.riesgo ? coloresDe(v, cats.map(function (c) { return c.valor; }), paletaPantalla()) : null; // 1.7.2: color del nivel
+    return '<details class="filtro' + (sel.length ? ' activo' : '') + (v.riesgo ? ' riesgo' : '') + '" data-filtro="' + id + '"><summary>' + esc(nombre) + (sel.length ? ' <span class="cuenta">' + (sel.length === 1 ? esc(sel[0]) : sel.length) + '</span>' : '') + '</summary><div class="menu">' +
+      cats.map(function (c, i) { return '<label><input type="checkbox" data-filtro-cat="' + id + '" value="' + esc(c.valor) + '"' + (sel.indexOf(c.valor) >= 0 ? ' checked' : '') + '>' +
+        (colores && c.valor !== D.SIN_DATO ? '<span class="punto-riesgo" style="background:' + colores[i] + '"></span>' : '') + '<span>' + esc(c.valor) + '</span><span class="n">' + num(c.n) + '</span></label>'; }).join('') +
       '<div class="pie-menu"><button type="button" class="btn chico fantasma" data-accion="limpiar-cat" data-id="' + id + '">Limpiar</button>' +
-      (FILTROS_FIJOS.indexOf(id) < 0 ? '<button type="button" class="btn chico fantasma" data-accion="quitar-filtro" data-id="' + id + '">Quitar filtro</button>' : '') +
+      (!esFijo(id) ? '<button type="button" class="btn chico fantasma" data-accion="quitar-filtro" data-id="' + id + '">Quitar filtro</button>' : '') +
       '<button type="button" class="btn chico" data-accion="cerrar-menu">Listo</button></div></div></details>';
   }
 
@@ -888,6 +1088,11 @@
     if (nav) { estado.vista = nav.dataset.vista; guardarPreferencias(); render(); window.scrollTo(0, 0); return; }
     var un = e.target.closest('[data-unidad]');
     if (un) { estado.unidad = un.dataset.unidad; guardarPreferencias(); aplicar(); return; }
+    var fl = e.target.closest('[data-filtrar]'); // 1.7.2: barra, tramo o encabezado de nivel → filtra todo el tablero
+    if (fl) {
+      $$('details.filtro[open]').forEach(function (d) { d.open = false; });
+      filtrarPor(fl.getAttribute('data-filtrar'), fl.getAttribute('data-valor'), e.ctrlKey || e.metaKey || e.shiftKey); return;
+    }
     // cerrar menús de filtro al tocar afuera
     $$('details.filtro[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
     var b = e.target.closest('[data-accion]');
@@ -913,6 +1118,19 @@
     }
     else if (acc === 'ordenar') { var o = b.dataset.orden; if (estado.participantes.orden === o) estado.participantes.asc = !estado.participantes.asc; else { estado.participantes.orden = o; estado.participantes.asc = true; } render(); }
     else if (acc === 'sugerencia') { estado.cruce.f = b.dataset.f; estado.cruce.c = b.dataset.c; render(); }
+    else if (acc === 'comparar-por') { estado.explorar.por = b.dataset.v; render(); }
+    else if (acc === 'perfil-test') { estado.perfil.test = b.dataset.v; render(); }
+    else if (acc === 'perfil-ver') { // de la tabla de perfil a Cruces (categorías) o a Explorar (medidas numéricas)
+      var vp = D.variable(b.dataset.v);
+      if (vp && vp.tipo === 'numerica') { estado.explorar.v = vp.id; estado.explorar.por = estado.perfil.test; estado.vista = 'explorar'; }
+      else { estado.cruce.f = b.dataset.v; estado.cruce.c = estado.perfil.test; estado.cruce.mostrar = 'columna'; estado.vista = 'cruces'; }
+      guardarPreferencias(); render(); window.scrollTo(0, 0);
+    }
+    else if (acc === 'perfil-csv' && graficos._perfil) guardarArchivo(nombreArchivo(graficos._perfil.titulo) + '.csv', tablaCsv(graficos._perfil.tabla), 'text/csv;charset=utf-8');
+    else if (acc === 'perfil-informe' && graficos._perfil) {
+      estado.informe.push({ svg: graficos._perfil.informe, lectura: graficos._perfil.lecturaInforme, nota: '', titulo: graficos._perfil.titulo });
+      aviso('Agregado al informe (' + estado.informe.length + ').');
+    }
     else if (acc === 'sug-rel') { estado.relacion.x = b.dataset.x; estado.relacion.y = b.dataset.y; render(); }
     else if (acc === 'invertir') { var tmp = estado.cruce.f; estado.cruce.f = estado.cruce.c; estado.cruce.c = tmp; render(); }
     else if (acc === 'limpiar-cat') { delete estado.filtros.cat[b.dataset.id]; aplicar(); }
@@ -944,7 +1162,7 @@
       aplicar(); return;
     }
     if (t.dataset.accionCambio === 'agregar-filtro') {
-      if (t.value && estado.extraFiltros.indexOf(t.value) < 0 && FILTROS_FIJOS.indexOf(t.value) < 0) estado.extraFiltros.push(t.value);
+      if (t.value && estado.extraFiltros.indexOf(t.value) < 0 && !esFijo(t.value)) estado.extraFiltros.push(t.value);
       render(); var d = $('details[data-filtro="' + t.value + '"]'); if (d) d.open = true; return;
     }
     if (t.dataset.activa) { estado.fuentes[Number(t.dataset.activa)].activa = t.checked; recalcularTodo(); return; }
@@ -965,6 +1183,13 @@
       estado.participantes.buscar = t.value;
       clearTimeout(t._reloj); t._reloj = setTimeout(function () { render(); var b = $('[data-campo="participantes.buscar"]'); if (b) { b.focus(); b.setSelectionRange(b.value.length, b.value.length); } }, 250);
     }
+  });
+
+  // 1.7.2: con el teclado, Enter o espacio sobre una barra también filtra
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var fl = e.target.closest && e.target.closest('rect[data-filtrar]');
+    if (fl) { e.preventDefault(); filtrarPor(fl.getAttribute('data-filtrar'), fl.getAttribute('data-valor'), e.ctrlKey || e.metaKey || e.shiftKey); }
   });
 
   // Arrastrar y soltar archivos

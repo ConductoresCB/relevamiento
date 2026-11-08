@@ -173,6 +173,28 @@
     return res && { rho: res.r, n: res.n, p: res.p };
   }
 
+  /* Kruskal-Wallis (1.7.2): compara una medida numérica entre 2 o más grupos sin suponer distribución normal.
+     H con corrección por empates; p con la aproximación chi cuadrado de k − 1 grados de libertad (la misma que SciPy).
+     grupos: [[x…], …]. Los grupos vacíos no cuentan. Devuelve null si hay menos de 2 grupos con datos. */
+  function kruskalWallis(grupos) {
+    var gs = grupos.map(limpios).filter(function (g) { return g.length; });
+    if (gs.length < 2) return null;
+    var todos = [], de = [];
+    gs.forEach(function (g, i) { g.forEach(function (x) { todos.push(x); de.push(i); }); });
+    var N = todos.length; if (N < 3) return null;
+    var r = rangos(todos), R = gs.map(function () { return 0; });
+    r.forEach(function (rk, k) { R[de[k]] += rk; });
+    var H = 12 / (N * (N + 1)) * R.reduce(function (a, Ri, i) { return a + Ri * Ri / gs[i].length; }, 0) - 3 * (N + 1);
+    // corrección por empates: 1 − Σ(t³ − t) / (N³ − N)
+    var cuenta = {}; todos.forEach(function (x) { cuenta[x] = (cuenta[x] || 0) + 1; });
+    var T = Object.keys(cuenta).reduce(function (a, k) { var t = cuenta[k]; return a + t * t * t - t; }, 0);
+    var C = 1 - T / (N * N * N - N);
+    if (C <= 0) return { H: 0, gl: gs.length - 1, p: 1, N: N }; // todos los valores iguales
+    H /= C;
+    var gl = gs.length - 1;
+    return { H: H, gl: gl, p: gammaQ(gl / 2, H / 2), N: N };
+  }
+
   /* Cortes "lindos" para ejes e histogramas. */
   function pasoLindo(rango, objetivo) {
     var bruto = rango / Math.max(1, objetivo), mag = Math.pow(10, Math.floor(Math.log10(bruto || 1)));
@@ -202,7 +224,7 @@
   }
 
   var api = { media: media, desvio: desvio, cuantil: cuantil, resumen: resumen, gammaQ: gammaQ, betaI: betaI, pT: pT,
-    chiCuadrado: chiCuadrado, fisher2x2: fisher2x2, pearson: pearson, spearman: spearman, rangos: rangos,
+    chiCuadrado: chiCuadrado, fisher2x2: fisher2x2, kruskalWallis: kruskalWallis, pearson: pearson, spearman: spearman, rangos: rangos,
     ejeLindo: ejeLindo, histograma: histograma };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else raiz.Estadistica = api;

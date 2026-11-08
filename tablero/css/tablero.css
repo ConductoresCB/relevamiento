@@ -241,3 +241,36 @@ table.datos th button { border: 0; background: none; font-weight: 700; color: in
 .escala-app .cifra { font-size: 13px; color: var(--tinta-2); }
 .escala-app .cifra b { font-family: var(--f-mono); color: var(--tinta); font-size: 16px; }
 @media (max-width: 560px) { .escala-app .tramos { grid-template-columns: 1fr !important; } .escala-app .tramo { flex-direction: row; align-items: baseline; flex-wrap: wrap; } .escala-app .color { width: 40px; flex: none; } }
+
+/* ---------- 1.7.2 · Filtro cruzado y Perfil por riesgo ---------- */
+.lienzo .filtrable { cursor: pointer; outline: none; }
+.lienzo .filtrable:hover, .lienzo .filtrable:focus-visible { fill: var(--g-acento); fill-opacity: .08; }
+.lienzo .filtrable:focus-visible { stroke: var(--azul); stroke-width: 2; }
+.escala-app button.tramo { font: inherit; text-align: left; background: none; border: 0; padding: 4px; margin: -4px; border-radius: 6px; cursor: pointer; color: inherit; }
+.escala-app button.tramo:hover { background: var(--azul-claro); }
+.escala-app button.tramo:focus-visible { outline: 2px solid var(--azul); outline-offset: 1px; }
+.escala-app .tramo.elegido { background: var(--azul-claro); box-shadow: inset 0 0 0 2px var(--azul); }
+.escala-app .tramo.atenuado { opacity: .45; }
+.pista-filtro { font-size: 13px; color: var(--tinta-2); margin: 10px 0 0; }
+.enlace { font: inherit; border: 0; background: none; padding: 0; color: var(--azul); font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; text-align: left; }
+.enlace:hover { color: var(--azul-osc); }
+.chip.activo { border-color: var(--azul); background: var(--azul-claro); color: var(--azul-osc); }
+.chip:disabled { opacity: .45; cursor: default; }
+.chips > .sub { align-self: center; margin-right: 4px; }
+.punto-riesgo { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); }
+.filtro.riesgo .menu label { align-items: center; }
+table.perfil { font-size: 13px; }
+table.perfil th.nivel button { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; padding: 2px 4px; border-radius: 6px; }
+table.perfil th.nivel button:hover { background: var(--azul-claro); }
+table.perfil th.nivel.elegido { box-shadow: inset 0 -3px 0 var(--azul); }
+table.perfil .n-col { display: block; font-weight: 400; font-family: var(--f-mono); font-size: 11.5px; color: var(--tenue); }
+table.perfil tr.var th { background: var(--superficie-2); color: var(--tinta); font-size: 13.5px; position: static; padding-top: 10px; }
+table.perfil tr.var td { background: var(--superficie-2); font-family: var(--f-mono); }
+table.perfil td.cat { padding-left: 22px; color: var(--tinta); }
+table.perfil tr.tenue td { color: var(--tenue); font-size: 12px; }
+table.perfil td.elegido { box-shadow: inset 2px 0 0 var(--azul), inset -2px 0 0 var(--azul); }
+table.perfil .p-baja { font-weight: 700; color: var(--tinta); }
+.etiqueta-comp { display: inline-block; font-size: 11px; font-weight: 700; color: var(--azul-osc); background: var(--azul-claro); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+.etiqueta-comp.gris { color: var(--tinta-2); background: var(--superficie); border: 1px solid var(--linea); }
+.tabla-informe h3 { margin: 0 0 4px; }
+@media print { .pista-filtro { display: none; } }

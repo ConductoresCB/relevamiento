@@ -25,15 +25,17 @@
   var RIESGO = ['fr_categoria', 'fh_categoria'];
 
   // Columnas de control que no se ofrecen para graficar
-  var OCULTAS = ['id', 'codigo', 'orden', 'cp', 'hora_inicio', 'hora_fin', 'dispositivo', 'consentimiento', 'comparte_app',
+  // 1.7.2: «equipo» (letra) y «encuestador» (texto tal cual) se reemplazan por «dispositivo_nombre» y «encuestador_persona».
+  var OCULTAS = ['id', 'codigo', 'orden', 'cp', 'hora_inicio', 'hora_fin', 'dispositivo', 'consentimiento', 'comparte_app', 'equipo', 'encuestador',
     'modificado', 'version_instrumento', 'g_hora_ingesta', 'g_hora_medicion', 'g_que_ingirio', 'fr_aplica', 'fh_aplica',
     'fr_probabilidad', 'fh_riesgo', 'participante_id', 'socio_completo', 'bio_completo', 'gluc_realizada', 'g_acepta'];
 
   var META = {
     origen: { texto: 'Origen de los datos (planilla)', seccion: 'Relevamiento', tipo: 'multiple' },
     puesto: { texto: 'Punto o puesto de relevamiento', seccion: 'Relevamiento' },
-    equipo: { texto: 'Equipo', seccion: 'Relevamiento' },
-    encuestador: { texto: 'Encuestador/es', seccion: 'Relevamiento', tipo: 'multiple' },
+    // 1.7.2: los nombres salen de lo que se escribió en cada entrevista (no se escriben en el código, que es público)
+    encuestador_persona: { texto: 'Encuestador/a (como se escribió en la app; si fueron varios, cuenta para cada uno)', seccion: 'Relevamiento', tipo: 'multiple' },
+    dispositivo_nombre: { texto: 'Dispositivo de captura (letra y número) y quién lo usa', seccion: 'Relevamiento', tipo: 'multiple' },
     fecha: { texto: 'Fecha del relevamiento', seccion: 'Relevamiento', tipo: 'fecha' },
     estado: { texto: 'Estado del relevamiento', seccion: 'Relevamiento' },
     edad: { texto: 'Edad (años)', seccion: 'Relevamiento' },
@@ -75,7 +77,7 @@
     b_hta_dx: 'Diagnóstico de hipertensión', b_med_antihta: 'Medicación antihipertensiva', b_glucosa_previa: 'Glucosa elevada alguna vez',
     b_antec_fam_dbt: 'Antecedentes familiares de diabetes', b_fuma: 'Fuma tabaco', g_resultado_mgdl: 'Glucemia periférica', g_ayuno_min: 'Minutos de ayuno',
     fr_puntos: 'Puntaje FINDRISK', fr_categoria: 'Riesgo FINDRISK', fh_puntos: 'Puntaje Framingham', fh_categoria: 'Riesgo Framingham',
-    edad: 'Edad', puesto: 'Punto de relevamiento', origen: 'Planilla de origen', equipo: 'Equipo', encuestador: 'Encuestador/es',
+    edad: 'Edad', puesto: 'Punto de relevamiento', origen: 'Planilla de origen', encuestador_persona: 'Encuestador/a', dispositivo_nombre: 'Dispositivo',
     fecha: 'Fecha', estado: 'Estado del relevamiento', visitas: 'Visitas por participante', pas_140: 'Presión sistólica ≥ 140 mmHg',
     imc_mayor25: 'IMC de 25 o más'
   };
@@ -328,7 +330,53 @@
         } else { porId[clave] = r; orden.push(clave); }
       });
     });
-    return { filas: orden.map(function (k) { return recalcular(porId[k]); }), duplicados: duplicados };
+    var filas = orden.map(function (k) { return recalcular(porId[k]); });
+    identificarPersonas(filas);
+    return { filas: filas, duplicados: duplicados };
+  }
+
+  /* 1.7.2 · Encuestador/a y dispositivo con nombre.
+     En la app, si fueron varios se escriben «Ana y Luis»: se separan para que cada persona cuente por su cuenta.
+     El mismo nombre escrito con o sin tilde o mayúsculas se une, y se muestra la forma más usada.
+     Dispositivo: letra del equipo + número (J1), con el nombre de quien más lo usó («J1 · Fabiola»). */
+  var SEPARADOR_NOMBRES = /\s*(?:;|,|\/|&|\+|\s+y\s+|\s+e\s+)\s*/;
+  function partirNombres(s) {
+    return String(s === undefined || s === null ? '' : s).split(SEPARADOR_NOMBRES)
+      .map(function (x) { return x.replace(/\s+/g, ' ').trim(); }).filter(Boolean);
+  }
+  function claveNombre(s) { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9ñ ]/g, '').trim(); }
+  function claveDispositivo(r) {
+    var eq = String(r.equipo || '').trim().toUpperCase(), d = String(r.dispositivo === undefined ? '' : r.dispositivo).trim();
+    if (!eq) { var m = /^([A-Za-z]+)(\d+)-/.exec(String(r.participante_id || '')); if (m) { eq = m[1].toUpperCase(); d = d || m[2]; } }
+    return eq ? eq + d : '';
+  }
+  function identificarPersonas(filas) {
+    var grafias = {}; // clave → {grafía: veces}
+    filas.forEach(function (r) {
+      r._nombres = partirNombres(r.encuestador);
+      r._nombres.forEach(function (n) { var k = claveNombre(n); if (!k) return; (grafias[k] = grafias[k] || {})[n] = (grafias[k][n] || 0) + 1; });
+    });
+    var canon = {};
+    Object.keys(grafias).forEach(function (k) {
+      canon[k] = Object.keys(grafias[k]).sort(function (a, b) { return grafias[k][b] - grafias[k][a] || b.length - a.length || a.localeCompare(b); })[0];
+    });
+    var porDisp = {}; // dispositivo → {nombre: veces}
+    filas.forEach(function (r) {
+      var lista = [];
+      r._nombres.forEach(function (n) { var c = canon[claveNombre(n)]; if (c && lista.indexOf(c) < 0) lista.push(c); });
+      delete r._nombres;
+      if (lista.length) r.encuestador_persona = lista.join('; '); else delete r.encuestador_persona;
+      var d = claveDispositivo(r); r._disp = d;
+      if (d) { porDisp[d] = porDisp[d] || {}; lista.forEach(function (n) { porDisp[d][n] = (porDisp[d][n] || 0) + 1; }); }
+    });
+    var etiqueta = {};
+    Object.keys(porDisp).forEach(function (d) {
+      var c = porDisp[d], ord = Object.keys(c).sort(function (a, b) { return c[b] - c[a] || a.localeCompare(b); });
+      // quien más lo usó; si otra persona lo usó casi igual (al menos la mitad de las veces), también
+      var quien = ord.filter(function (n, i) { return i === 0 || (i === 1 && c[n] >= c[ord[0]] / 2); });
+      etiqueta[d] = d + (quien.length ? ' · ' + quien.join(' y ') : '');
+    });
+    filas.forEach(function (r) { if (r._disp) r.dispositivo_nombre = etiqueta[r._disp]; else delete r.dispositivo_nombre; delete r._disp; });
   }
 
   /* Control de calidad (1.4): el mismo código en relevamientos distintos (otro id) puede ser una persona
@@ -372,6 +420,11 @@
       vis.forEach(function (v) { if (v.encuestador && encs.indexOf(v.encuestador) < 0) encs.push(v.encuestador); });
       c.id = k; c.participante_id = k; c.visitas = vis.length; c.origen = origenes.join('; ');
       c.encuestador = encs.join('; ');
+      ['encuestador_persona', 'dispositivo_nombre'].forEach(function (campo) { // 1.7.2: todas las visitas, sin repetir
+        var todos = [];
+        vis.forEach(function (v) { String(v[campo] || '').split('; ').forEach(function (x) { if (x && todos.indexOf(x) < 0) todos.push(x); }); });
+        if (todos.length) c[campo] = todos.join('; '); else delete c[campo];
+      });
       var fechas = vis.map(function (v) { return v.fecha; }).filter(Boolean);
       c.fecha = fechas.length ? fechas[fechas.length - 1] : '';
       c.fecha_primera = fechas.length ? fechas[0] : '';
@@ -527,7 +580,7 @@
     diccionario: diccionario, variable: variable, SECCIONES_ORDEN: SECCIONES_ORDEN, SIN_DATO: SIN_DATO,
     leerXlsx: leerXlsx, leerCsv: leerCsv, normalizarFila: normalizarFila, esDelRelevamiento: esDelRelevamiento, fechaIso: fechaIso,
     recalcular: recalcular, unir: unir, consolidar: consolidar, codigosRepetidos: codigosRepetidos, valores: valores, tieneDato: tieneDato,
-    filtrar: filtrar, frecuencias: frecuencias, numeros: numeros, gruposDe: gruposDe, cruce: cruce, aCsv: aCsv
+    filtrar: filtrar, frecuencias: frecuencias, partirNombres: partirNombres, identificarPersonas: identificarPersonas, numeros: numeros, gruposDe: gruposDe, cruce: cruce, aCsv: aCsv
   };
   if (enNode) module.exports = api;
   else raiz.Datos = api;
