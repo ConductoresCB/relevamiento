@@ -104,7 +104,7 @@
   /* --------------------------------------------------------- Datos */
   function recalcularTodo() {
     var u = D.unir(estado.fuentes);
-    cache.base = u.filas; cache.duplicados = u.duplicados; cache.repetidos = D.codigosRepetidos(u.filas);
+    cache.base = u.filas; cache.duplicados = u.duplicados; cache.repetidos = D.codigosRepetidos(u.filas); cache.personas = u.personas;
     cache.participantes = D.consolidar(u.filas);
     aplicar();
   }
@@ -1012,6 +1012,13 @@
           cache.repetidos.slice(0, 12).map(function (x) { return '<span class="mono">' + esc(x.codigo) + '</span> (' + x.n + ')'; }).join(', ') +
           (cache.repetidos.length > 12 ? '…' : '') + '.</p>';
       }
+      // 1.7.3: qué nombres de encuestadores se unieron y cuáles quedaron sin unir por tener más de una posibilidad
+      var pe = cache.personas || { unidos: [], ambiguos: [] };
+      if (pe.unidos.length) html += '<p class="sub"><strong>Encuestadores unidos</strong> (nombre incompleto = nombre completo): ' +
+        pe.unidos.map(function (x) { return '«' + esc(x.de) + '» → «' + esc(x.a) + '»'; }).join(', ') + '.</p>';
+      if (pe.ambiguos.length) html += '<p class="nota-privacidad"><strong>Nombres sin unir:</strong> ' + pe.ambiguos.map(function (x) {
+        return '«' + esc(x.nombre) + '» puede ser ' + x.opciones.map(function (o) { return '«' + esc(o) + '»'; }).join(' o '); }).join('; ') +
+        '. Quedó como otra persona; corregí el nombre en la planilla si sabés quién fue.</p>';
     }
     html += '<div class="form-fila">' + (hayEjemplo() ? '<button type="button" class="btn sec" data-accion="quitar-ejemplo">Quitar los datos de ejemplo</button>' : '<button type="button" class="btn sec" data-accion="ejemplo">Cargar datos de ejemplo (ficticios)</button>') +
       (estado.fuentes.length ? '<button type="button" class="btn sec" data-accion="csv-filtrado">Descargar datos filtrados (CSV)</button>' : '') + '</div></div>';
@@ -1020,7 +1027,7 @@
       '<li>Las visitas de una misma persona se unen por su <strong>ID de participante</strong> (por ejemplo P1-0014): en la vista por participantes, cada dato toma el valor más reciente que no esté vacío.</li>' +
       '<li>FINDRISK, Framingham e IMC se recalculan con las mismas fórmulas de la app, usando los datos unidos.</li>' +
       '<li>Variables agregadas para analizar: grupo de edad, IMC según OMS, presión ≥ 140, años como chofer, horas sin parar y horas de sueño agrupadas.</li>' +
-      '<li><strong>Encuestador/a</strong> sale de lo que se escribió en cada entrevista; si fueron varios («Ana y Luis»), cuenta para cada uno. El mismo nombre con o sin tilde o mayúsculas se une. <strong>Dispositivo</strong> (en Más filtros) muestra la letra y el número con el nombre de quien más lo usó, por ejemplo «J1 · Ana».</li></ul></div>';
+      '<li><strong>Encuestador/a</strong> sale de lo que se escribió en cada entrevista; si fueron varios («Ana y Luis»), cuenta para cada uno. El mismo nombre con o sin tilde o mayúsculas se une, y un nombre incompleto se une con el completo que lo contiene («Fabián» = «Fabián López») si hay una sola posibilidad. <strong>Dispositivo</strong> (en Más filtros) muestra la letra y el número con el nombre de quien más lo usó, por ejemplo «J1 · Ana».</li></ul></div>';
     return html;
   }
 

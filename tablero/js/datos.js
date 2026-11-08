@@ -331,13 +331,16 @@
       });
     });
     var filas = orden.map(function (k) { return recalcular(porId[k]); });
-    identificarPersonas(filas);
-    return { filas: filas, duplicados: duplicados };
+    var personas = identificarPersonas(filas);
+    return { filas: filas, duplicados: duplicados, personas: personas };
   }
 
   /* 1.7.2 · Encuestador/a y dispositivo con nombre.
      En la app, si fueron varios se escriben «Ana y Luis»: se separan para que cada persona cuente por su cuenta.
      El mismo nombre escrito con o sin tilde o mayúsculas se une, y se muestra la forma más usada.
+     1.7.3 (decisión del equipo): un nombre incompleto es la misma persona que el nombre completo que lo contiene
+     («Fabián» = «Fabián López»), siempre que haya una sola posibilidad. Si hay dos («Fabián López» y «Fabián Gómez»),
+     no se une y queda anotado para revisar a mano en Fuentes.
      Dispositivo: letra del equipo + número (J1), con el nombre de quien más lo usó («J1 · Fabiola»). */
   var SEPARADOR_NOMBRES = /\s*(?:;|,|\/|&|\+|\s+y\s+|\s+e\s+)\s*/;
   function partirNombres(s) {
@@ -347,19 +350,41 @@
   function claveNombre(s) { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9ñ ]/g, '').trim(); }
   function claveDispositivo(r) {
     var eq = String(r.equipo || '').trim().toUpperCase(), d = String(r.dispositivo === undefined ? '' : r.dispositivo).trim();
-    if (!eq) { var m = /^([A-Za-z]+)(\d+)-/.exec(String(r.participante_id || '')); if (m) { eq = m[1].toUpperCase(); d = d || m[2]; } }
+    // si falta la letra o el número, se toman del ID del participante (J1-0811 → J y 1)
+    var m = /^([A-Za-z]+)(\d+)-/.exec(String(r.participante_id || ''));
+    if (m && !eq) eq = m[1].toUpperCase();
+    if (m && !d && m[1].toUpperCase() === eq) d = m[2];
     return eq ? eq + d : '';
   }
+  function cuidado(s) { return (s.match(/[A-ZÁÉÍÓÚÑÜ]/g) || []).length + (s.match(/[áéíóúñüÁÉÍÓÚÑÜ]/g) || []).length; }
   function identificarPersonas(filas) {
     var grafias = {}; // clave → {grafía: veces}
     filas.forEach(function (r) {
       r._nombres = partirNombres(r.encuestador);
       r._nombres.forEach(function (n) { var k = claveNombre(n); if (!k) return; (grafias[k] = grafias[k] || {})[n] = (grafias[k][n] || 0) + 1; });
     });
-    var canon = {};
-    Object.keys(grafias).forEach(function (k) {
-      canon[k] = Object.keys(grafias[k]).sort(function (a, b) { return grafias[k][b] - grafias[k][a] || b.length - a.length || a.localeCompare(b); })[0];
+    var canon = {}, claves = Object.keys(grafias);
+    claves.forEach(function (k) {
+      // la forma más escrita; si empatan, la más cuidada (con mayúsculas y tildes): «Fabián López» antes que «fabian lopez»
+      canon[k] = Object.keys(grafias[k]).sort(function (a, b) { return grafias[k][b] - grafias[k][a] || cuidado(b) - cuidado(a) || b.length - a.length || a.localeCompare(b); })[0];
     });
+    // 1.7.3: nombre incompleto → nombre completo que lo contiene (todas sus palabras, en el mismo orden)
+    var palabras = {};
+    claves.forEach(function (k) { palabras[k] = k.split(' ').filter(Boolean); });
+    function contenido(a, b) {
+      var pa = palabras[a], pb = palabras[b], j = 0;
+      if (pa.length >= pb.length) return false;
+      for (var i = 0; i < pb.length && j < pa.length; i++) if (pb[i] === pa[j]) j++;
+      return j === pa.length;
+    }
+    var unidos = [], ambiguos = [], destino = {};
+    claves.forEach(function (k) {
+      var cand = claves.filter(function (b) { return contenido(k, b); });
+      var maximos = cand.filter(function (c) { return !cand.some(function (d) { return d !== c && contenido(c, d); }); });
+      if (maximos.length === 1) { destino[k] = maximos[0]; unidos.push({ de: canon[k], a: canon[maximos[0]] }); }
+      else if (maximos.length > 1) ambiguos.push({ nombre: canon[k], opciones: maximos.map(function (m) { return canon[m]; }) });
+    });
+    Object.keys(destino).forEach(function (k) { canon[k] = canon[destino[k]]; });
     var porDisp = {}; // dispositivo → {nombre: veces}
     filas.forEach(function (r) {
       var lista = [];
@@ -377,6 +402,7 @@
       etiqueta[d] = d + (quien.length ? ' · ' + quien.join(' y ') : '');
     });
     filas.forEach(function (r) { if (r._disp) r.dispositivo_nombre = etiqueta[r._disp]; else delete r.dispositivo_nombre; delete r._disp; });
+    return { unidos: unidos, ambiguos: ambiguos };
   }
 
   /* Control de calidad (1.4): el mismo código en relevamientos distintos (otro id) puede ser una persona
