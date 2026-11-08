@@ -28,7 +28,7 @@
   // 1.7.2: «equipo» (letra) y «encuestador» (texto tal cual) se reemplazan por «dispositivo_nombre» y «encuestador_persona».
   var OCULTAS = ['id', 'codigo', 'orden', 'cp', 'hora_inicio', 'hora_fin', 'dispositivo', 'consentimiento', 'comparte_app', 'equipo', 'encuestador',
     'modificado', 'version_instrumento', 'g_hora_ingesta', 'g_hora_medicion', 'g_que_ingirio', 'fr_aplica', 'fh_aplica',
-    'fr_probabilidad', 'fh_riesgo', 'participante_id', 'socio_completo', 'bio_completo', 'gluc_realizada', 'g_acepta'];
+    'fr_probabilidad', 'fh_riesgo', 'participante_id', 'id_archivo', 'socio_completo', 'bio_completo', 'gluc_realizada', 'g_acepta'];
 
   var META = {
     origen: { texto: 'Origen de los datos (planilla)', seccion: 'Relevamiento', tipo: 'multiple' },

@@ -1151,7 +1151,7 @@
       var r = estado.actual;
       imagenResultados(r).then(function (bl) {
         if (!bl) throw new Error('no se pudo armar la imagen');
-        return S.compartirODescargar('resultados_' + idArchivo(r) + '_' + r.fecha + '.png', bl, 'image/png', 'Resultados ' + idArchivo(r));
+        return S.compartirODescargar('resultados_' + nombreBase(r) + '.png', bl, 'image/png', 'Resultados ' + nombreBase(r));
       }).then(function (modo) { anotar('Imagen de resultados', (r.participante_id || 'sin ID') + ' · ' + modo); toast('Imagen de resultados lista'); },
         function (e) { if (!(e && e.name === 'AbortError')) toast('No se pudo guardar: ' + (e && e.message || 'error')); });
     },
@@ -1160,7 +1160,7 @@
       if (estado.subiendo || !puedeSubir()) return;
       estado.subiendo = 'resultados'; refrescar(); pantallaEncendida(true);
       imagenResultados(r).then(function (bl) {
-        return S.subirArchivo(aj.url, aj.clave, 'resultados', 'resultados_' + idArchivo(r) + '_' + r.fecha + '.png', bl);
+        return S.subirArchivo(aj.url, aj.clave, 'resultados', 'resultados_' + nombreBase(r) + '.png', bl);
       }).then(function (res) {
         // Se anota en el relevamiento sin cambiar su fecha de modificación (no hace falta volver a enviarlo a la planilla)
         r.drive = Object.assign({}, r.drive, { resultados: ahoraISO() });
@@ -1558,7 +1558,7 @@
             : a.copiado ? '<span class="estado sinc">' + ico('check', 16) + 'Copiado a la PC</span>' : '<span class="estado pend"><span class="punto-pendiente"></span>Solo en el celular</span>') +
           '</span></div>';
       }).join('') + '</div>' : '<div class="vacio">Todavía no hay grabaciones.</div>') +
-      '<span class="ayuda">Cada audio se nombra con «rel-» y las primeras 8 cifras del id de su relevamiento (columna «id» de la planilla), sin datos de la persona. Con señal, «Subir a Drive» los guarda directo en la carpeta «Grabaciones» del Drive del proyecto. «Pasar» los comparte o los guarda en este dispositivo. Lo que ya está en Drive o copiado se puede borrar del celular para liberar espacio.</span>' +
+      '<span class="ayuda">Cada audio se nombra con el ID del participante y 8 caracteres al azar (por ejemplo A1-0010_3f9a21c7), sin datos de la persona; en la planilla, la hoja «Archivos» los lista con su enlace. Con señal, «Subir a Drive» los guarda directo en la carpeta «Grabaciones» del Drive del proyecto. «Pasar» los comparte o los guarda en este dispositivo. Lo que ya está en Drive o copiado se puede borrar del celular para liberar espacio.</span>' +
       region('subidaAudios', REGIONES.subidaAudios()) +
       '<div class="empujar-abajo" style="display:flex;flex-direction:column;gap:10px">' +
       '<button type="button" class="btn primario" data-accion="audios-pasar"' + (sinCopiar.length ? '' : ' disabled') + '>' + ico('bajar', 22) + 'Pasar ' + sinCopiar.length + (sinCopiar.length === 1 ? ' audio' : ' audios') + '</button>' +
@@ -1581,10 +1581,16 @@
     return DB.audios().then(function (l) { estado.audios = (l || []).map(function (a) { return a; }); }).catch(function () { estado.audios = []; });
   }
 
-  /* 1.8: los archivos que salen del celular (audios e imagen de resultados) se nombran con un identificador al azar:
-     las primeras 8 cifras del id del relevamiento (aleatorio, columna «id» de la planilla), sin orden, edad ni código postal. */
-  function idArchivo(r) { return 'rel-' + String(r && r.id ? r.id : '').replace(/[^0-9a-f]/gi, '').slice(0, 8).toLowerCase(); }
-  function nombreAudio(r) { return idArchivo(r) + '_' + (r ? r.fecha : hoy()); }
+  /* 1.8.1: los archivos que salen del celular (audios e imagen de resultados) se nombran con el ID del participante
+     (equipo, dispositivo y N° de orden: A1-0010) y los primeros 8 caracteres del id del relevamiento, que es aleatorio
+     (columna «id_archivo» de la planilla): A1-0010_3f9a21c7. No llevan orden-edad-código postal.
+     Si todavía no hay ID del participante (grabación cortada antes de cargar el N° de orden): sin-id_3f9a21c7. */
+  function idArchivo(r) { return String(r && r.id ? r.id : '').replace(/[^0-9a-f]/gi, '').slice(0, 8).toLowerCase(); }
+  function nombreBase(r) {
+    var pid = String(r && r.participante_id ? r.participante_id : '').replace(/[^A-Za-z0-9-]/g, '');
+    return (pid || 'sin-id') + '_' + idArchivo(r);
+  }
+  function nombreAudio(r) { return nombreBase(r); }
   Gr.nombrePara(function (regId) { return nombreAudio(estado.registros.find(function (x) { return x.id === regId; }) || estado.actual); });
   function detenerGrabacion(r) {
     return Gr.detener(nombreAudio(r)).then(function (a) {
