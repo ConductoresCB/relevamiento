@@ -35,17 +35,18 @@
   function enviar(url, clave, registros, alAvanzar) {
     var lotes = [];
     for (var i = 0; i < registros.length; i += 25) lotes.push(registros.slice(i, i + 25));
-    var confirmados = [];
+    var confirmados = [], repetidos = [];
     return lotes.reduce(function (cadena, lote, n) {
       return cadena.then(function () {
         var cuerpo = { accion: 'guardar', token: clave, registros: lote.map(Reg.aplanar) };
         return postJSON(url, cuerpo).then(function (resp) {
           if (!resp || !resp.ok) throw new Error((resp && resp.error) || 'Respuesta inválida de la planilla');
           confirmados = confirmados.concat(resp.recibidos || []);
+          (resp.pidRepetidos || []).forEach(function (p) { if (repetidos.indexOf(p) < 0) repetidos.push(p); }); // 1.8.2
           if (alAvanzar) alAvanzar(n + 1, lotes.length);
         });
       });
-    }, Promise.resolve()).then(function () { return confirmados; });
+    }, Promise.resolve()).then(function () { confirmados.repetidos = repetidos; return confirmados; });
   }
 
   /* ---------- 1.7: subir archivos a Drive (a través del script de la planilla) ----------

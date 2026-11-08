@@ -158,6 +158,7 @@
       reg.codigo = R.codigo(reg.orden, reg.edad, reg.cp);
       // El ID interno sale del N° de orden: si se corrige el orden, se corrige el ID.
       if (clave === 'orden' && reg.pid_origen === 'orden') reg.participante_id = R.idParticipante(reg.equipo, reg.dispositivo, reg.orden);
+      if (clave === 'orden' && recordarOrden(reg)) guardarAjustes();
     }
     tocar();
   }
@@ -413,8 +414,21 @@
     var d = Number(aj.ordenDesde), h = Number(aj.ordenHasta);
     var usados = estado.registros.filter(function (r) {
       return r.equipo === aj.equipo && String(r.dispositivo) === String(aj.dispositivo);
-    }).map(function (r) { return Number(r.orden); }).filter(function (n) { return n >= d && n <= h; });
+    }).map(function (r) { return Number(r.orden); });
+    // 1.8.2: el último N° usado se recuerda aunque se borren los datos del celular, así no se repiten IDs
+    usados.push(Number((aj.ordenUsado || {})[claveDispositivo(aj)]) || 0);
+    usados = usados.filter(function (n) { return n >= d && n <= h; });
     return usados.length ? Math.min(h, Math.max.apply(null, usados) + 1) : d;
+  }
+  function claveDispositivo(x) { return String(x.equipo || '').toUpperCase() + String(x.dispositivo == null ? '' : x.dispositivo); }
+  /* 1.8.2: anota el N° de orden más alto usado en cada equipo+dispositivo (queda en Ajustes; el borrado no lo toca) */
+  function recordarOrden(r) {
+    var aj = estado.ajustes, n = Number(r && r.orden), k = claveDispositivo(r || {});
+    if (!(n > 0) || !k) return false;
+    aj.ordenUsado = aj.ordenUsado || {};
+    if (n <= (Number(aj.ordenUsado[k]) || 0)) return false;
+    aj.ordenUsado[k] = n;
+    return true;
   }
 
   /* El N° de orden no se repite en un mismo dispositivo: de él salen el código y el ID interno. */
@@ -1025,6 +1039,8 @@
       '<div class="grilla-campos">' + campo('equipo', 'Equipo', { placeholder: 'A' }) + campo('dispositivo', 'N° de dispositivo', { inputmode: 'numeric' }) + '</div>' +
       '<div class="grilla-campos">' + campo('ordenDesde', 'Orden desde', { inputmode: 'numeric', refrescar: true }) + campo('ordenHasta', 'Orden hasta', { inputmode: 'numeric', refrescar: true }) + '</div>' +
       region('rango', REGIONES.rango()) +
+      ((estado.ajustes.ordenUsado || {})[claveDispositivo(estado.ajustes)] ? '<span class="ayuda">Último N° de orden usado en ' + esc(claveDispositivo(estado.ajustes)) + ': ' +
+        R.pad(estado.ajustes.ordenUsado[claveDispositivo(estado.ajustes)], 3) + '. Se recuerda aunque se borren los datos del celular, para no repetir IDs.</span>' : '') +
       '<span class="ayuda">Si cada integrante usa un solo celular, el N° de dispositivo queda en 1. Cambia solo si la misma persona carga desde un segundo aparato: ahí va 2 y otro rango de orden, para que no se repitan códigos ni IDs.</span>' +
       campo('encuestador', 'Encuestador/a habitual', { placeholder: 'Nombre o iniciales', ayuda: 'Aparece ya escrito en cada entrevista nueva; ahí se puede cambiar.' }) + campo('puesto', 'Puesto o lugar de relevamiento', { placeholder: 'p. ej. Susques, RN 52' }) + '</section>' +
       '<section class="tarjeta"><h2 class="seccion">Planilla de Google</h2>' +
@@ -1096,6 +1112,7 @@
         contacto: {}, socio: {}, bio: {}, estado: 'borrador', creado: ahoraISO(), modificado: null, sincronizado: null,
         version_instrumento: I.CUESTIONARIO.version };
       estado.actual = r;
+      if (recordarOrden(r)) guardarAjustes();
       ir('#/consentimiento/' + r.id);
     },
     'ver-todos': function () { estado.verTodos = !estado.verTodos; refrescar(); },
@@ -1316,9 +1333,13 @@
             if (ids.indexOf(r.id) >= 0 && r.modificado === marcas[r.id]) { r.sincronizado = ahora; hechos.push(r); }
           });
           aj.ultimaSync = ahora; guardarAjustes();
-          var faltan = pend.length - hechos.length;
+          var faltan = pend.length - hechos.length, rep = ids.repetidos || [];
           estado.mensajeSync = 'Listo: ' + hechos.length + ' relevamientos guardados en la planilla.' +
-            (faltan ? ' ' + faltan + ' no se confirmaron: quedan pendientes para el próximo envío.' : '');
+            (faltan ? ' ' + faltan + ' no se confirmaron: quedan pendientes para el próximo envío.' : '') +
+            // 1.8.2: el script avisa si un ID del participante ya estaba en la planilla con otro relevamiento
+            (rep.length ? ' ATENCIÓN: ' + (rep.length === 1 ? 'el ID ' + rep[0] + ' ya existía' : 'los ID ' + rep.join(', ') + ' ya existían') +
+              ' en la planilla con otro relevamiento. Avisale a la administradora y revisá el N° de orden (si es otro camionero, corregí el orden y volvé a sincronizar).' : '');
+          if (rep.length) { toast('ID repetido en la planilla: ' + rep.join(', ')); anotar('ID repetido en la planilla', rep.join(', ')); }
           anotar('Envío a la planilla', hechos.length + ' confirmados de ' + pend.length);
           return DB.guardarVarios(hechos);
         })
@@ -1714,6 +1735,8 @@
       return DB.todos();
     }).then(function (regs) {
       estado.registros = regs || [];
+      // 1.8.2: lo que ya está en el celular también cuenta como «último N° usado»
+      if (estado.registros.map(recordarOrden).some(Boolean)) guardarAjustes();
       return Gr.recuperar(function (regId) { var x = estado.registros.find(function (y) { return y.id === regId; }); return x ? nombreAudio(x) : null; }).then(function (rec) {
         // Grabaciones interrumpidas (la app se cerró de golpe): se agregan a su relevamiento
         rec.forEach(function (a) {
