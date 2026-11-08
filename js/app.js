@@ -420,11 +420,14 @@
     usados = usados.filter(function (n) { return n >= d && n <= h; });
     return usados.length ? Math.min(h, Math.max.apply(null, usados) + 1) : d;
   }
+  /* 1.8.3: si el punto de relevamiento dice «prueba», el relevamiento es de prueba: no usa N° de orden
+     (la casilla queda inhabilitada), no avanza la numeración y su ID es «PRUEBA» (archivos PRUEBA_3f9a21c7…). */
+  function esDePrueba(x) { return /prueba/i.test(String((x && x.puesto) || '')); }
   function claveDispositivo(x) { return String(x.equipo || '').toUpperCase() + String(x.dispositivo == null ? '' : x.dispositivo); }
   /* 1.8.2: anota el N° de orden más alto usado en cada equipo+dispositivo (queda en Ajustes; el borrado no lo toca) */
   function recordarOrden(r) {
     var aj = estado.ajustes, n = Number(r && r.orden), k = claveDispositivo(r || {});
-    if (!(n > 0) || !k) return false;
+    if (!(n > 0) || !k || esDePrueba(r)) return false;
     aj.ordenUsado = aj.ordenUsado || {};
     if (n <= (Number(aj.ordenUsado[k]) || 0)) return false;
     aj.ordenUsado[k] = n;
@@ -443,7 +446,8 @@
   function erroresIdentificacion(r) {
     var e = [];
     var o = num(r.orden), ed = num(r.edad), rep = ordenRepetido(r);
-    if (o === null) e.push('Falta el N° de orden.');
+    if (esDePrueba(r)) { /* 1.8.3: la prueba no lleva N° de orden */ }
+    else if (o === null) e.push('Falta el N° de orden.');
     else if (o < 1 || o > 999 || o % 1) e.push('El N° de orden tiene 3 cifras (de 1 a 999). Si el rango de Ajustes empieza en 1000 o más, corregilo ahí.');
     if (rep) e.push('El N° de orden ' + o + ' ya se usó en este dispositivo (código ' + (rep.codigo || 'sin completar') + ').');
     if (ed === null || ed < RANGOS.edad[0] || ed > RANGOS.edad[1] || ed % 1) e.push('La edad debe ser un número entero entre ' + RANGOS.edad[0] + ' y ' + RANGOS.edad[1] + '.');
@@ -456,6 +460,8 @@
   REGIONES.codigo = function () {
     var r = estado.actual; if (!r) return '';
     var rep = ordenRepetido(r), o = num(r.orden), fuera = o !== null && (o < 1 || o > 999 || o % 1);
+    if (esDePrueba(r)) return '<div class="placa"><span class="valor">PRUEBA</span><span class="partes">relevamiento de prueba · sin N° de orden</span></div>' +
+      '<span class="ayuda">El punto de relevamiento dice «' + esc(r.puesto) + '»: no usa número ni avanza la numeración. Para uno real, cambiá el punto en Ajustes y empezá un relevamiento nuevo.</span>';
     return '<div class="placa"><span class="valor">' + esc(r.codigo || '___-__-____') + '</span><span class="partes">orden · edad · código postal</span></div>' +
       (fuera ? '<span class="error-linea">' + ico('alerta', 18) + 'El N° de orden tiene 3 cifras: va de 1 a 999</span>'
         : rep ? '<span class="error-linea">' + ico('alerta', 18) + 'Ese N° de orden ya se usó en este dispositivo (código ' + esc(rep.codigo || 'sin completar') + ')</span>'
@@ -480,7 +486,8 @@
       pasosRelevamiento(r, 0) +
       '<section style="display:flex;flex-direction:column;gap:8px"><h2 class="seccion">' + esc(T.codigoIdentificacion) + '</h2>' +
       '<div class="grilla-campos tres">' +
-      '<div class="campo"><label for="reg-orden">N° de orden</label><input class="entrada mono centro" id="reg-orden" inputmode="numeric" autocomplete="off" data-campo="reg.orden" data-refrescar="1" value="' + esc(r.orden) + '"></div>' +
+      '<div class="campo"><label for="reg-orden">N° de orden</label><input class="entrada mono centro" id="reg-orden" inputmode="numeric" autocomplete="off" data-campo="reg.orden" data-refrescar="1" value="' + esc(r.orden) + '"' +
+        (esDePrueba(r) ? ' disabled placeholder="—" title="Relevamiento de prueba: sin N° de orden"' : '') + '></div>' +
       '<div class="campo"><label for="reg-edad">Edad</label><input class="entrada mono centro" id="reg-edad" inputmode="numeric" autocomplete="off" maxlength="2" data-campo="reg.edad" data-refrescar="1" value="' + esc(r.edad) + '"></div>' +
       '<div class="campo"><label for="reg-cp">Cód. postal</label><input class="entrada mono centro" id="reg-cp" inputmode="numeric" autocomplete="off" maxlength="4" data-campo="reg.cp" data-refrescar="1" value="' + esc(r.cp) + '"></div>' +
       '</div><span class="ayuda">El orden se sugiere solo: siguiente número libre del rango de este dispositivo (' + R.pad(aj.ordenDesde, 3) + '–' + R.pad(aj.ordenHasta, 3) + ').</span>' +
@@ -1042,7 +1049,7 @@
       ((estado.ajustes.ordenUsado || {})[claveDispositivo(estado.ajustes)] ? '<span class="ayuda">Último N° de orden usado en ' + esc(claveDispositivo(estado.ajustes)) + ': ' +
         R.pad(estado.ajustes.ordenUsado[claveDispositivo(estado.ajustes)], 3) + '. Se recuerda aunque se borren los datos del celular, para no repetir IDs.</span>' : '') +
       '<span class="ayuda">Si cada integrante usa un solo celular, el N° de dispositivo queda en 1. Cambia solo si la misma persona carga desde un segundo aparato: ahí va 2 y otro rango de orden, para que no se repitan códigos ni IDs.</span>' +
-      campo('encuestador', 'Encuestador/a habitual', { placeholder: 'Nombre o iniciales', ayuda: 'Aparece ya escrito en cada entrevista nueva; ahí se puede cambiar.' }) + campo('puesto', 'Puesto o lugar de relevamiento', { placeholder: 'p. ej. Susques, RN 52' }) + '</section>' +
+      campo('encuestador', 'Encuestador/a habitual', { placeholder: 'Nombre o iniciales', ayuda: 'Aparece ya escrito en cada entrevista nueva; ahí se puede cambiar.' }) + campo('puesto', 'Puesto o lugar de relevamiento', { placeholder: 'p. ej. Susques, RN 52', ayuda: 'Si escribís «prueba», los relevamientos nuevos son de prueba: sin N° de orden y sin avanzar la numeración.' }) + '</section>' +
       '<section class="tarjeta"><h2 class="seccion">Planilla de Google</h2>' +
       campoTexto('aj.url', 'Dirección de la aplicación web (Apps Script)', aj.url, { area: true }) +
       campoTexto('aj.clave', 'Clave del equipo', aj.clave, { tipo: 'password', ayuda: 'La misma en todos los dispositivos y en el script. Cifra los paquetes.' }) +
@@ -1107,7 +1114,9 @@
   var ACCIONES = {
     'nuevo': function () {
       var aj = estado.ajustes;
-      var r = { id: uuid(), participante_id: '', orden: String(siguienteOrden()), edad: '', cp: '', codigo: '', fecha: hoy(), hora_inicio: horaAhora(),
+      var prueba = esDePrueba(aj);
+      var r = { id: uuid(), participante_id: prueba ? 'PRUEBA' : '', pid_origen: prueba ? 'prueba' : undefined,
+        orden: prueba ? '' : String(siguienteOrden()), edad: '', cp: '', codigo: '', fecha: hoy(), hora_inicio: horaAhora(),
         equipo: aj.equipo, dispositivo: aj.dispositivo, encuestador: aj.encuestador, puesto: aj.puesto, consentimiento: false,
         contacto: {}, socio: {}, bio: {}, estado: 'borrador', creado: ahoraISO(), modificado: null, sincronizado: null,
         version_instrumento: I.CUESTIONARIO.version };
