@@ -63,6 +63,7 @@
     cruce: { f: 'p34_actividad_fisica', c: 'fr_categoria', mostrar: 'fila', num: 'b_imc' },
     perfil: { test: 'fr_categoria', grupo: 'socio' },
     relacion: { x: 'p16_horas_sin_parar', y: 'b_imc', color: '', recta: true },
+    pruebas: { tipo: ['auto', 'param', 'noparam'].indexOf(guardado.prueba) >= 0 ? guardado.prueba : 'auto' }, // 1.9.0
     participantes: { orden: 'completo', asc: true, buscar: '' },
     informe: [], conexion: { url: guardado.url || '', clave: guardado.clave || '', recordar: !!guardado.clave }
   };
@@ -92,7 +93,7 @@
   }
   function guardarPreferencias() {
     try {
-      localStorage.setItem('tablero-relevamiento', JSON.stringify({ unidad: estado.unidad, vista: estado.vista, url: estado.conexion.url,
+      localStorage.setItem('tablero-relevamiento', JSON.stringify({ unidad: estado.unidad, vista: estado.vista, url: estado.conexion.url, prueba: estado.pruebas.tipo,
         clave: estado.conexion.recordar ? estado.conexion.clave : '' }));
     } catch (e) { /* sin almacenamiento: no pasa nada */ }
   }
@@ -281,6 +282,7 @@
     return 'n = <strong>' + num(r.n) + '</strong>. Media <strong>' + num(r.media, 1) + u + '</strong>' + (r.de !== null ? ' (DE ' + num(r.de, 1) + ')' : '') +
       '; mediana ' + num(r.mediana, 1) + ' (RIC ' + num(r.q1, 1) + ' a ' + num(r.q3, 1) + '); mínimo ' + num(r.min, 1) + ', máximo ' + num(r.max, 1) + '.';
   }
+  function nombreTipo() { return { auto: 'Automática', param: 'Paramétrica', noparam: 'No paramétrica' }[estado.pruebas.tipo]; }
   function textoP(p) { return p < 0.001 ? 'p < 0,001' : 'p = ' + num(p, 3); }
 
   /* 1.8.4 · Independencia de las observaciones. En modo «Relevamientos» un mismo camionero puede aparecer
@@ -296,6 +298,62 @@
     });
     return rep;
   }
+  /* ---------- 1.9.0 · Tipo de prueba para medidas numéricas ----------
+     Todas las muestras del estudio son independientes (una entrevista por conductor).
+     Quien analiza elige: Automática (Shapiro-Wilk decide), Paramétrica o No paramétrica.
+     Paramétricas: t de Welch (2 grupos), ANOVA de Welch (3 o más), r de Pearson.
+     No paramétricas: U de Mann-Whitney (2 grupos), Kruskal-Wallis (3 o más), ρ de Spearman.
+     Chi cuadrado y Fisher (categorías) no suponen normalidad: el selector no los cambia. */
+  var TIPOS_PRUEBA = [['auto', 'Automática (según normalidad)'], ['param', 'Paramétrica'], ['noparam', 'No paramétrica']];
+  function selectorPrueba() {
+    return '<label class="campo"><span>Tipo de prueba (medidas numéricas)</span><select class="entrada" data-campo="pruebas.tipo" ' +
+      'title="Automática: si Shapiro-Wilk no rechaza la normalidad en ningún grupo se usa la paramétrica; si la rechaza, la no paramétrica. Chi cuadrado y Fisher no cambian.">' +
+      TIPOS_PRUEBA.map(function (o) { return '<option value="' + o[0] + '"' + (estado.pruebas.tipo === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>';
+  }
+  /* Shapiro-Wilk en cada grupo. Devuelve los grupos donde se rechaza la normalidad (p < 0,05) y los que no se pueden evaluar. */
+  function normalidad(listas, nombres) {
+    var rechazos = [], sinEvaluar = [];
+    listas.forEach(function (xs, i) {
+      var sw = E.shapiroWilk(xs);
+      if (!sw) sinEvaluar.push(nombres[i]);
+      else if (sw.p < 0.05) rechazos.push({ nombre: nombres[i], p: sw.p });
+    });
+    return { rechazos: rechazos, sinEvaluar: sinEvaluar };
+  }
+  function listaRechazos(rs) {
+    return rs.map(function (r) { return '«' + r.nombre + '» (' + textoP(r.p) + ')'; }).join(', ');
+  }
+  /* Decide paramétrica o no paramétrica y explica por qué. queEs: «grupo» o «medida». */
+  function elegirTipo(norm, queEs) {
+    var modo = estado.pruebas.tipo, pl = queEs === 'medida' ? 'ninguna de las dos medidas' : 'ningún grupo';
+    if (modo === 'param') return { tipo: 'param', motivo: 'elegida por quien analiza',
+      aviso: norm.rechazos.length ? 'Atención: Shapiro-Wilk rechaza la normalidad en ' + listaRechazos(norm.rechazos) + '; la prueba paramétrica puede no ser adecuada.' : '' };
+    if (modo === 'noparam') return { tipo: 'noparam', motivo: 'elegida por quien analiza', aviso: '' };
+    if (norm.sinEvaluar.length) return { tipo: 'noparam', aviso: '',
+      motivo: 'elegida automáticamente: no se puede evaluar la normalidad en ' + norm.sinEvaluar.map(function (n) { return '«' + n + '»'; }).join(', ') + ' (menos de 3 casos o todos iguales)' };
+    if (norm.rechazos.length) return { tipo: 'noparam', aviso: '', motivo: 'elegida automáticamente: Shapiro-Wilk rechaza la normalidad en ' + listaRechazos(norm.rechazos) };
+    return { tipo: 'param', aviso: '', motivo: 'elegida automáticamente: Shapiro-Wilk no rechaza la normalidad en ' + pl + ' (p ≥ 0,05)' };
+  }
+  /* Compara una medida numérica entre grupos independientes. Devuelve null si hay menos de 2 grupos con datos. */
+  function compararGrupos(listas, nombres) {
+    var L = [], N = [];
+    listas.forEach(function (xs, i) { var l = xs.filter(function (x) { return typeof x === 'number' && isFinite(x); }); if (l.length) { L.push(l); N.push(nombres[i]); } });
+    if (L.length < 2) return null;
+    var el = elegirTipo(normalidad(L, N), 'grupo'), r = null, nombre = '', estad = '';
+    if (el.tipo === 'param') {
+      if (L.length === 2) { r = E.tWelch(L[0], L[1]); if (r) { nombre = 't de Welch'; estad = 't(' + num(r.gl, 1) + ') = ' + num(r.t, 2); } }
+      else { r = E.anovaWelch(L); if (r) { nombre = 'ANOVA de Welch'; estad = 'F(' + r.gl1 + '; ' + num(r.gl2, 1) + ') = ' + num(r.F, 2); } }
+      if (!r) { el = { tipo: 'noparam', aviso: '', motivo: 'la paramétrica necesita al menos 2 casos con valores distintos en cada grupo; se usó la no paramétrica' }; }
+    }
+    if (el.tipo === 'noparam') {
+      if (L.length === 2) { r = E.mannWhitney(L[0], L[1]); if (r) { nombre = 'U de Mann-Whitney'; estad = 'U = ' + num(r.U, 1); } }
+      else { r = E.kruskalWallis(L); if (r) { nombre = 'Kruskal-Wallis'; estad = 'H(' + r.gl + ') = ' + num(r.H, 2); } }
+    }
+    if (!r) return null;
+    return { p: r.p, tipo: el.tipo, nombre: nombre, estad: estad, motivo: el.motivo, aviso: el.aviso,
+      texto: nombre + ' (' + (el.tipo === 'param' ? 'paramétrica' : 'no paramétrica') + ', ' + el.motivo + ')' };
+  }
+
   function avisoSinP(rep) {
     return 'No se muestra el valor p: ' + num(rep) + ' ' + (rep === 1 ? 'camionero aparece' : 'camioneros aparecen') +
       ' en más de un relevamiento, así que las observaciones no son independientes. Pasá a <strong>Participantes</strong> (arriba, a la izquierda de los filtros) para ver la prueba.';
@@ -571,7 +629,7 @@
     var html = '<div class="tarjeta"><div class="controles">' +
       '<label class="campo"><span>Pregunta o medición</span><select class="entrada" data-campo="explorar.v">' + opcionesVariables(['categorica', 'multiple', 'numerica'], v.id) + '</select></label>' +
       '<label class="campo"><span>Comparar entre grupos de</span><select class="entrada" data-campo="explorar.por">' + opcionesVariables(['categorica', 'multiple'], ex.por, 'Sin comparar (todos juntos)') + '</select></label>' +
-      '</div><p class="sub">' + esc(v.texto) + '</p>' +
+      (v.tipo === 'numerica' && por ? selectorPrueba() : '') + '</div><p class="sub">' + esc(v.texto) + '</p>' +
       '<div class="chips"><span class="sub">Comparar por resultado del test:</span>' + [['fr_categoria', 'Riesgo FINDRISK'], ['fh_categoria', 'Riesgo Framingham'], ['', 'Sin comparar']].map(function (o) {
         return '<button type="button" class="chip' + (ex.por === o[0] ? ' activo' : '') + '" data-accion="comparar-por" data-v="' + o[0] + '"' + (o[0] === v.id ? ' disabled' : '') + '>' + o[1] + '</button>'; }).join('') + '</div></div>';
     var g;
@@ -606,10 +664,18 @@
         return gr === 'Otras' ? vals.some(function (x) { return grupos.otras.indexOf(x) >= 0; }) : vals.indexOf(gr) >= 0;
       }).map(function (r) { return r[v.id]; }).filter(function (x) { return typeof x === 'number'; });
       var s = E.resumen(xs);
-      return { etiqueta: gr, n: s.n, media: s.media, de: s.de, mediana: s.mediana };
+      return { etiqueta: gr, n: s.n, media: s.media, de: s.de, mediana: s.mediana, xs: xs };
     });
+    // 1.9.0: prueba entre grupos (sin p si hay camioneros repetidos en modo Relevamientos)
+    var rep = repetidosEn(F.filter(function (r) { return typeof r[v.id] === 'number' && D.tieneDato(r, por); }));
+    var multi = por.tipo === 'multiple';
+    var cmp = rep || multi ? null : compararGrupos(items.map(function (i) { return i.xs; }), items.map(function (i) { return i.etiqueta; }));
+    var extra = multi ? '<div class="prueba">Es una pregunta de opción múltiple: una persona puede estar en varios grupos, así que no corresponde una prueba entre grupos independientes.</div>' :
+      rep ? '<div class="prueba">' + avisoSinP(rep) + '</div>' :
+      cmp ? '<div class="prueba">' + esc(cmp.nombre) + ': <strong>' + esc(cmp.estad) + '; ' + textoP(cmp.p) + '</strong>. Prueba ' + (cmp.tipo === 'param' ? 'paramétrica' : 'no paramétrica') + ', ' + esc(cmp.motivo) + '.' +
+        (cmp.aviso ? ' ' + esc(cmp.aviso) : '') + ' Una diferencia entre grupos no indica causa.</div>' : '';
     var g = { id: 'exp', titulo: v.nombre + ' según ' + minus(por.nombre), subtitulo: 'Media por grupo; la línea fina marca ± 1 desvío estándar',
-      lectura: items.filter(function (i) { return i.n; }).length >= 2 ? 'Compará las medias junto con la cantidad de casos de cada grupo: con pocos casos la media cambia mucho.' : 'Hay menos de dos grupos con datos.',
+      lectura: items.filter(function (i) { return i.n; }).length >= 2 ? 'Compará las medias junto con la cantidad de casos de cada grupo: con pocos casos la media cambia mucho.' : 'Hay menos de dos grupos con datos.', extra: extra,
       tabla: { cabecera: ['Grupo', 'n', 'Media', 'DE', 'Mediana'], filas: items.map(function (i) { return [i.etiqueta, num(i.n), num(i.media, 1), num(i.de, 1), num(i.mediana, 1)]; }) },
       dibujar: function (t) { return G.medias(items, t, { ancho: anchoActual, titulo: v.nombre }); } };
     if (!items.some(function (i) { return i.n; })) g.vacio = 'Sin datos con los filtros actuales.';
@@ -763,9 +829,9 @@
         var tot = E.resumen(D.numeros(filas, v));
         if (!tot.n) { sinDatos.push(v.etiqueta); return; }
         var res = grupos.map(function (g) { return E.resumen(D.numeros(g, v)); });
-        var kw = E.kruskalWallis(grupos.map(function (g) { return D.numeros(g, v); }));
+        var cmp = sinP ? null : compararGrupos(grupos.map(function (g) { return D.numeros(g, v); }), cats); // 1.9.0
         var u = unidadDe(v);
-        bloques.push({ v: v, numerica: true, p: kw && !sinP ? kw.p : null, prueba: kw && !sinP ? 'Kruskal-Wallis H(' + kw.gl + ') = ' + num(kw.H, 2) : '', filas: [
+        bloques.push({ v: v, numerica: true, p: cmp ? cmp.p : null, tipoPrueba: cmp ? cmp.tipo : '', prueba: cmp ? cmp.estad + ' · ' + cmp.texto + (cmp.aviso ? '. ' + cmp.aviso : '') : '', filas: [
           { etiqueta: 'Media (DE)' + (u ? ' · ' + u : ''), celdas: res.map(function (r) { return r.n ? num(r.media, 1) + (r.de !== null ? ' (' + num(r.de, 1) + ')' : '') : '—'; }), total: num(tot.media, 1) + (tot.de !== null ? ' (' + num(tot.de, 1) + ')' : '') },
           { etiqueta: 'Mediana [RIC]', celdas: res.map(function (r) { return r.n ? num(r.mediana, 1) + ' [' + num(r.q1, 1) + '–' + num(r.q3, 1) + ']' : '—'; }), total: num(tot.mediana, 1) + ' [' + num(tot.q1, 1) + '–' + num(tot.q3, 1) + ']' },
           { etiqueta: 'Con dato', celdas: res.map(function (r) { return num(r.n); }), total: num(tot.n), tenue: true }] });
@@ -805,7 +871,8 @@
     R.bloques.forEach(function (b) {
       var nombre = esc(b.v.etiqueta), marca = comp.indexOf(b.v.id) >= 0 ? ' <span class="etiqueta-comp" title="Entra en el cálculo del test">en el puntaje</span>' : '';
       var pTxt = b.multiple ? '<span title="Opción múltiple: cada persona puede estar en varias filas; mirá cada opción en Cruces">—</span>' :
-        '<span title="' + esc(b.prueba) + '"' + (b.p !== null && b.p < 0.05 ? ' class="p-baja"' : '') + '>' + pCorto(b.p) + (b.cuidado ? '*' : '') + '</span>';
+        '<span title="' + esc(b.prueba) + '"' + (b.p !== null && b.p < 0.05 ? ' class="p-baja"' : '') + '>' + pCorto(b.p) + (b.cuidado ? '*' : '') + '</span>' +
+        (b.tipoPrueba ? ' <span class="tipo-p" title="' + esc(b.prueba) + '">' + (b.tipoPrueba === 'param' ? 'P' : 'NP') + '</span>' : '');
       html += '<tr class="var"><th colspan="' + ncol + '" scope="rowgroup">' + (interactivo ? '<button type="button" class="enlace" data-accion="perfil-ver" data-v="' + b.v.id + '" title="Ver en ' + (b.numerica ? 'Explorar' : 'Cruces') + '">' + nombre + '</button>' : nombre) +
         marca + (b.multiple ? ' <span class="etiqueta-comp gris">varias opciones</span>' : '') + '</th><td class="n">' + pTxt + '</td></tr>';
       var maxPct = Math.max.apply(null, [1e-9].concat([].concat.apply([], b.filas.map(function (f) { return (f.pcts || []).filter(function (x) { return x !== null; }); }))));
@@ -828,7 +895,7 @@
       [['fr_categoria', 'FINDRISK (diabetes)'], ['fh_categoria', 'Framingham (cardiovascular)']].map(function (o) {
         return '<button type="button" data-accion="perfil-test" data-v="' + o[0] + '" aria-pressed="' + (vt.id === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div></div>' +
       '<label class="campo"><span>Variables</span><select class="entrada" data-campo="perfil.grupo">' + grupos.map(function (g) {
-        return '<option value="' + g.id + '"' + (g.id === gr.id ? ' selected' : '') + '>' + esc(g.titulo) + '</option>'; }).join('') + '</select></label></div>' +
+        return '<option value="' + g.id + '"' + (g.id === gr.id ? ' selected' : '') + '>' + esc(g.titulo) + '</option>'; }).join('') + '</select></label>' + selectorPrueba() + '</div>' +
       '<p class="sub">Tocá un nivel (encabezado de columna) para ver solo ese grupo en todo el tablero; tocá una variable para abrirla en Cruces o en Explorar.</p></div>';
     if (!filas.length) return html + '<div class="vacio">Ningún ' + nombreUnidad(1) + ' tiene ' + esc(vt.nombre) + ' calculado con los filtros actuales.</div>';
     var R = calcularPerfil(vt, filas, gr.vars), sel = seleccion(vt.id);
@@ -838,7 +905,10 @@
     var titulo = 'Perfil según ' + minus(vt.nombre) + ' · ' + gr.titulo;
     var sub = num(R.N) + ' ' + nombreUnidad(R.N) + ' con ' + vt.nombre + ' calculado' + (sinTest ? ' · ' + num(sinTest) + ' sin ' + vt.nombre + ' no entran' : '');
     var lectura = 'Los porcentajes son <strong>por columna</strong>: dentro de cada nivel de riesgo, qué proporción tiene cada característica (sobre quienes respondieron esa pregunta). ' +
-      'p: chi cuadrado (prueba exacta de Fisher en tablas 2 × 2) para categorías y Kruskal-Wallis para medidas numéricas' +
+      'p: chi cuadrado (prueba exacta de Fisher en tablas 2 × 2) para categorías. Medidas numéricas, tipo de prueba «' + nombreTipo() + '»: ' +
+      '<strong>P</strong> = paramétrica (t de Welch con 2 niveles, ANOVA de Welch con 3 o más), <strong>NP</strong> = no paramétrica (U de Mann-Whitney o Kruskal-Wallis)' +
+      (estado.pruebas.tipo === 'auto' ? '; se usa la paramétrica si Shapiro-Wilk no rechaza la normalidad en ningún nivel' : '') +
+      (R.bloques.some(function (b) { return b.prueba && b.prueba.indexOf('Atención') >= 0; }) ? '; en alguna medida Shapiro-Wilk rechaza la normalidad (pasá el cursor sobre la p)' : '') + '; el detalle de cada prueba aparece al pasar el cursor sobre la p' +
       (R.bloques.some(function (b) { return b.cuidado; }) ? '; * más del 20 % de las celdas con frecuencia esperada menor que 5, tomalo como orientativo' : '') + '. ' +
       (hayComp ? '«En el puntaje»: la variable entra en el cálculo del test, así que es esperable que cambie entre niveles. ' : '') +
       (chicos.length ? 'Niveles con menos de 10 casos (' + chicos.map(esc).join(', ') + '): sus porcentajes cambian mucho con cada caso. ' : '') +
@@ -880,17 +950,23 @@
       '<label class="campo"><span>Eje horizontal</span><select class="entrada" data-campo="relacion.x">' + opcionesVariables(['numerica'], r.x) + '</select></label>' +
       '<label class="campo"><span>Eje vertical</span><select class="entrada" data-campo="relacion.y">' + opcionesVariables(['numerica'], r.y) + '</select></label>' +
       '<label class="campo"><span>Color por (hasta 3 grupos)</span><select class="entrada" data-campo="relacion.color">' + opcionesVariables(['categorica'], r.color, 'Un solo color') + '</select></label>' +
-      '<label class="casilla"><input type="checkbox" data-campo="relacion.recta"' + (r.recta ? ' checked' : '') + '> Recta de tendencia</label></div>' +
+      selectorPrueba() + '<label class="casilla"><input type="checkbox" data-campo="relacion.recta"' + (r.recta ? ' checked' : '') + '> Recta de tendencia</label></div>' +
       '<div class="chips">' + SUGERENCIAS_REL.map(function (s) { return '<button type="button" class="chip" data-accion="sug-rel" data-x="' + s[0] + '" data-y="' + s[1] + '">' + esc(s[2]) + '</button>'; }).join('') + '</div></div>';
     var pares = F.filter(function (row) { return typeof row[vx.id] === 'number' && typeof row[vy.id] === 'number'; });
     var grupos = vcol ? D.gruposDe(pares, vcol, 3) : null;
     var pe = E.pearson(pares.map(function (p) { return p[vx.id]; }), pares.map(function (p) { return p[vy.id]; }));
     var sp = E.spearman(pares.map(function (p) { return p[vx.id]; }), pares.map(function (p) { return p[vy.id]; }));
     var ux = unidadDe(vx), uy = unidadDe(vy), repRel = repetidosEn(pares); // 1.8.4
+    // 1.9.0: Pearson (paramétrica) o Spearman (no paramétrica) según el tipo de prueba elegido
+    var elR = elegirTipo(normalidad([pares.map(function (p) { return p[vx.id]; }), pares.map(function (p) { return p[vy.id]; })], [vx.nombre, vy.nombre]), 'medida');
+    var usaP = elR.tipo === 'param', coef = usaP ? (pe ? pe.r : NaN) : (sp ? sp.rho : NaN), pCoef = usaP ? (pe ? pe.p : null) : (sp ? sp.p : null);
     var titulo = vy.nombre + ' según ' + minus(vx.nombre);
     var lectura = pares.length < 3 ? 'Hacen falta al menos 3 casos con las dos medidas.' :
-      'Con <strong>' + num(pares.length) + '</strong> ' + nombreUnidad(pares.length) + ' con ambas medidas: r de Pearson = <strong>' + num(pe ? pe.r : NaN, 2) + '</strong>' + (repRel ? '' : ' (' + (pe ? textoP(pe.p) : '—') + ')') + '; ρ de Spearman = ' + num(sp ? sp.rho : NaN, 2) + (repRel ? '' : ' (' + (sp ? textoP(sp.p) : '—') + ')') + '. ' +
-      (pe ? (Math.abs(pe.r) < 0.1 ? 'Prácticamente no hay relación lineal.' : 'La relación es ' + (pe.r > 0 ? 'positiva' : 'negativa') + ' y ' + (Math.abs(pe.r) < 0.3 ? 'débil' : Math.abs(pe.r) < 0.5 ? 'moderada' : 'fuerte') + '. ') : '') +
+      'Con <strong>' + num(pares.length) + '</strong> ' + nombreUnidad(pares.length) + ' con ambas medidas: ' +
+      (usaP ? 'r de Pearson' : 'ρ de Spearman') + ' = <strong>' + num(coef, 2) + '</strong>' + (repRel || pCoef === null ? '' : ' (<strong>' + textoP(pCoef) + '</strong>)') +
+      (repRel ? '.' : '. Prueba ' + (usaP ? 'paramétrica' : 'no paramétrica') + ', ' + esc(elR.motivo) + '.' + (elR.aviso ? ' ' + esc(elR.aviso) : '')) +
+      ' Como referencia, ' + (usaP ? 'ρ de Spearman = ' + num(sp ? sp.rho : NaN, 2) : 'r de Pearson = ' + num(pe ? pe.r : NaN, 2)) + '. ' +
+      (isFinite(coef) ? (Math.abs(coef) < 0.1 ? 'Prácticamente no hay relación' + (usaP ? ' lineal.' : '.') : 'La relación es ' + (coef > 0 ? 'positiva' : 'negativa') + ' y ' + (Math.abs(coef) < 0.3 ? 'débil' : Math.abs(coef) < 0.5 ? 'moderada' : 'fuerte') + '. ') : '') +
       ' Una correlación no indica causa.' + (pares.length < 30 ? ' Con menos de 30 casos, un solo valor extremo puede cambiar mucho el resultado.' : '') +
       (repRel ? ' ' + avisoSinP(repRel) : '');
     var g = { id: 'rel', titulo: titulo, subtitulo: 'Cada punto es un ' + nombreUnidad(1) + ' · n = ' + num(pares.length), lectura: lectura,
@@ -1202,6 +1278,7 @@
       var ruta = t.dataset.campo, valor = t.type === 'checkbox' ? t.checked : t.value;
       asignar(ruta, valor);
       if (ruta.indexOf('conexion') === 0) { guardarPreferencias(); return; }
+      if (ruta === 'pruebas.tipo') guardarPreferencias();
       if (ruta === 'participantes.buscar') return;
       render();
     }

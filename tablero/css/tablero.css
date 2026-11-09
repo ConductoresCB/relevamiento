@@ -274,3 +274,7 @@ table.perfil .p-baja { font-weight: 700; color: var(--tinta); }
 .etiqueta-comp.gris { color: var(--tinta-2); background: var(--superficie); border: 1px solid var(--linea); }
 .tabla-informe h3 { margin: 0 0 4px; }
 @media print { .pista-filtro { display: none; } }
+
+/* 1.9.0 · Marca del tipo de prueba en Perfil por riesgo: P = paramétrica, NP = no paramétrica */
+.tipo-p { display: inline-block; margin-left: 4px; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 700;
+  letter-spacing: .02em; color: var(--tinta-2); border: 1px solid var(--grilla); vertical-align: 1px; cursor: help; }
