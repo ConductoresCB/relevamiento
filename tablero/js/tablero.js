@@ -283,10 +283,30 @@
   }
   function textoP(p) { return p < 0.001 ? 'p < 0,001' : 'p = ' + num(p, 3); }
 
-  function textoPrueba(x) {
+  /* 1.8.4 · Independencia de las observaciones. En modo «Relevamientos» un mismo camionero puede aparecer
+     una vez por visita: esas filas no son independientes y las pruebas (chi cuadrado, Fisher, Kruskal-Wallis,
+     Pearson, Spearman) darían valores p engañosos. Devuelve cuántos camioneros tienen más de una fila. */
+  function repetidosEn(filas) {
+    if (estado.unidad !== 'relevamientos') return 0;
+    var vistos = {}, rep = 0;
+    (filas || []).forEach(function (r) {
+      var k = r.participante_id || r.id;
+      vistos[k] = (vistos[k] || 0) + 1;
+      if (vistos[k] === 2) rep++;
+    });
+    return rep;
+  }
+  function avisoSinP(rep) {
+    return 'No se muestra el valor p: ' + num(rep) + ' ' + (rep === 1 ? 'camionero aparece' : 'camioneros aparecen') +
+      ' en más de un relevamiento, así que las observaciones no son independientes. Pasá a <strong>Participantes</strong> (arriba, a la izquierda de los filtros) para ver la prueba.';
+  }
+
+  function textoPrueba(x, filasConDato) { // filasConDato (1.8.4): las filas que tienen las dos respuestas
     if (!x.simple) return '<div class="prueba">Hay una pregunta de opción múltiple: cada persona puede estar en varias filas o columnas, así que no corresponde la prueba de chi cuadrado.</div>';
     var filasCon = x.totFila.filter(function (n) { return n > 0; }).length, colsCon = x.totCol.filter(function (n) { return n > 0; }).length;
     if (filasCon < 2 || colsCon < 2) return '<div class="prueba">Hace falta al menos dos categorías con casos en cada pregunta para comparar.</div>';
+    var rep = repetidosEn(filasConDato);
+    if (rep) return '<div class="prueba">' + avisoSinP(rep) + '</div>';
     var t = x.tabla.filter(function (f, i) { return x.totFila[i] > 0; }).map(function (f) { return f.filter(function (c, j) { return x.totCol[j] > 0; }); });
     var chi = E.chiCuadrado(t), html = '';
     if (t.length === 2 && t[0].length === 2) {
@@ -603,7 +623,7 @@
     });
     var titulo = v.nombre + ' según ' + minus(por.nombre);
     var g = { id: 'exp', titulo: titulo, subtitulo: '% dentro de cada grupo · n = ' + num(x.N) + ' con ambas respuestas',
-      lectura: textoCruceGrupos(x), extra: textoPrueba(x),
+      lectura: textoCruceGrupos(x), extra: textoPrueba(x, F.filter(function (r) { return D.tieneDato(r, v) && D.tieneDato(r, por); })),
       tabla: { cabecera: ['Respuesta'].concat(x.columnas.map(function (c, j) { return c + ' (n = ' + x.totCol[j] + ')'; })),
         filas: cats.map(function (c) { return [c.etiqueta].concat(c.valores.map(function (v2) { return num(v2.n) + ' (' + num(v2.pct, 1) + ' %)'; })); }) },
       dibujar: function (t) {
@@ -652,7 +672,7 @@
       return { etiqueta: f, base: x.totFila[i], partes: x.columnas.map(function (cc, j) { return { n: x.tabla[i][j], pct: x.totFila[i] ? x.tabla[i][j] / x.totFila[i] * 100 : 0 }; }) };
     }).filter(function (f) { return f.base > 0; });
     var g = { id: 'cruce', titulo: titulo, subtitulo: '% por fila · n = ' + num(x.N) + ' ' + nombreUnidad(x.N) + ' con ambas respuestas' + (x.sinDato ? ' · sin alguno de los dos datos: ' + num(x.sinDato) : ''),
-      lectura: textoCruce(x, vf, vc), extra: textoPrueba(x),
+      lectura: textoCruce(x, vf, vc), extra: textoPrueba(x, F.filter(function (r) { return D.tieneDato(r, vf) && D.tieneDato(r, vc); })),
       tabla: tablaCruce(x, 'fila'),
       dibujar: function (t) {
         var col = coloresDe(vc, x.columnas, t);
@@ -733,6 +753,7 @@
   function pCorto(p) { return p === null || p === undefined || isNaN(p) ? '—' : p < 0.001 ? '< 0,001' : num(p, 3); }
 
   function calcularPerfil(vt, filas, ids) {
+    var sinP = repetidosEn(filas) > 0; // 1.8.4: sin valor p con visitas repetidas
     var cats = D.frecuencias(filas, vt).categorias.filter(function (c) { return c.n > 0; }).map(function (c) { return c.valor; });
     var grupos = cats.map(function (c) { return filas.filter(function (r) { return D.valores(r, vt).indexOf(c) >= 0; }); });
     var bloques = [], sinDatos = [];
@@ -744,7 +765,7 @@
         var res = grupos.map(function (g) { return E.resumen(D.numeros(g, v)); });
         var kw = E.kruskalWallis(grupos.map(function (g) { return D.numeros(g, v); }));
         var u = unidadDe(v);
-        bloques.push({ v: v, numerica: true, p: kw ? kw.p : null, prueba: kw ? 'Kruskal-Wallis H(' + kw.gl + ') = ' + num(kw.H, 2) : '', filas: [
+        bloques.push({ v: v, numerica: true, p: kw && !sinP ? kw.p : null, prueba: kw && !sinP ? 'Kruskal-Wallis H(' + kw.gl + ') = ' + num(kw.H, 2) : '', filas: [
           { etiqueta: 'Media (DE)' + (u ? ' · ' + u : ''), celdas: res.map(function (r) { return r.n ? num(r.media, 1) + (r.de !== null ? ' (' + num(r.de, 1) + ')' : '') : '—'; }), total: num(tot.media, 1) + (tot.de !== null ? ' (' + num(tot.de, 1) + ')' : '') },
           { etiqueta: 'Mediana [RIC]', celdas: res.map(function (r) { return r.n ? num(r.mediana, 1) + ' [' + num(r.q1, 1) + '–' + num(r.q3, 1) + ']' : '—'; }), total: num(tot.mediana, 1) + ' [' + num(tot.q1, 1) + '–' + num(tot.q3, 1) + ']' },
           { etiqueta: 'Con dato', celdas: res.map(function (r) { return num(r.n); }), total: num(tot.n), tenue: true }] });
@@ -761,7 +782,7 @@
           total: num(x.totFila[i]) + ' (' + num(x.totFila[i] / x.N * 100, 1) + ' %)' });
       });
       b.filas.push({ etiqueta: 'Respondieron', celdas: jDe.map(function (j) { return j >= 0 ? num(x.totCol[j]) : '0'; }), total: num(x.N), tenue: true });
-      if (x.simple) {
+      if (x.simple && !sinP) {
         var t = x.tabla.filter(function (f, i) { return x.totFila[i] > 0; }).map(function (f) { return f.filter(function (c, j) { return x.totCol[j] > 0; }); });
         if (t.length >= 2 && t[0].length >= 2) {
           var chi = E.chiCuadrado(t);
@@ -771,7 +792,7 @@
       }
       bloques.push(b);
     });
-    return { cats: cats, ns: grupos.map(function (g) { return g.length; }), N: filas.length, bloques: bloques, sinDatos: sinDatos };
+    return { cats: cats, ns: grupos.map(function (g) { return g.length; }), N: filas.length, bloques: bloques, sinDatos: sinDatos, repetidos: repetidosEn(filas) };
   }
 
   function tablaPerfil(R, vt, interactivo) {
@@ -822,7 +843,8 @@
       (hayComp ? '«En el puntaje»: la variable entra en el cálculo del test, así que es esperable que cambie entre niveles. ' : '') +
       (chicos.length ? 'Niveles con menos de 10 casos (' + chicos.map(esc).join(', ') + '): sus porcentajes cambian mucho con cada caso. ' : '') +
       (conP > 5 ? 'Con ' + conP + ' pruebas a la vez, alguna puede dar p < 0,05 por azar: usalo para explorar y confirmalo con un análisis planificado. ' : '') +
-      'Una asociación no indica causa.' + (R.sinDatos.length ? ' Sin datos con los filtros actuales: ' + R.sinDatos.map(esc).join(', ') + '.' : '');
+      'Una asociación no indica causa.' + (R.sinDatos.length ? ' Sin datos con los filtros actuales: ' + R.sinDatos.map(esc).join(', ') + '.' : '') +
+      (R.repetidos ? ' ' + avisoSinP(R.repetidos) : '');
     var filtrosOtros = descripcionFiltros();
     html += '<article class="tarjeta" id="g-perfil"><header><h3>' + esc(titulo) + '</h3><p class="sub">' + esc(sub) + (sel.length ? ' · seleccionado en el resto del tablero: ' + esc(sel.join(', ')) : '') + '</p></header>' +
       '<p class="lectura">' + lectura + '</p><div class="desplazable">' + tablaPerfil(R, vt, true) + '</div>' +
@@ -864,12 +886,13 @@
     var grupos = vcol ? D.gruposDe(pares, vcol, 3) : null;
     var pe = E.pearson(pares.map(function (p) { return p[vx.id]; }), pares.map(function (p) { return p[vy.id]; }));
     var sp = E.spearman(pares.map(function (p) { return p[vx.id]; }), pares.map(function (p) { return p[vy.id]; }));
-    var ux = unidadDe(vx), uy = unidadDe(vy);
+    var ux = unidadDe(vx), uy = unidadDe(vy), repRel = repetidosEn(pares); // 1.8.4
     var titulo = vy.nombre + ' según ' + minus(vx.nombre);
     var lectura = pares.length < 3 ? 'Hacen falta al menos 3 casos con las dos medidas.' :
-      'Con <strong>' + num(pares.length) + '</strong> ' + nombreUnidad(pares.length) + ' con ambas medidas: r de Pearson = <strong>' + num(pe ? pe.r : NaN, 2) + '</strong> (' + (pe ? textoP(pe.p) : '—') + '); ρ de Spearman = ' + num(sp ? sp.rho : NaN, 2) + ' (' + (sp ? textoP(sp.p) : '—') + '). ' +
+      'Con <strong>' + num(pares.length) + '</strong> ' + nombreUnidad(pares.length) + ' con ambas medidas: r de Pearson = <strong>' + num(pe ? pe.r : NaN, 2) + '</strong>' + (repRel ? '' : ' (' + (pe ? textoP(pe.p) : '—') + ')') + '; ρ de Spearman = ' + num(sp ? sp.rho : NaN, 2) + (repRel ? '' : ' (' + (sp ? textoP(sp.p) : '—') + ')') + '. ' +
       (pe ? (Math.abs(pe.r) < 0.1 ? 'Prácticamente no hay relación lineal.' : 'La relación es ' + (pe.r > 0 ? 'positiva' : 'negativa') + ' y ' + (Math.abs(pe.r) < 0.3 ? 'débil' : Math.abs(pe.r) < 0.5 ? 'moderada' : 'fuerte') + '. ') : '') +
-      ' Una correlación no indica causa.' + (pares.length < 30 ? ' Con menos de 30 casos, un solo valor extremo puede cambiar mucho el resultado.' : '');
+      ' Una correlación no indica causa.' + (pares.length < 30 ? ' Con menos de 30 casos, un solo valor extremo puede cambiar mucho el resultado.' : '') +
+      (repRel ? ' ' + avisoSinP(repRel) : '');
     var g = { id: 'rel', titulo: titulo, subtitulo: 'Cada punto es un ' + nombreUnidad(1) + ' · n = ' + num(pares.length), lectura: lectura,
       tabla: { cabecera: ['ID', vx.nombre, vy.nombre].concat(vcol ? [vcol.nombre] : []), filas: pares.map(function (p) { return [p.participante_id || p.id, num(p[vx.id], 1), num(p[vy.id], 1)].concat(vcol ? [p[vcol.id] || ''] : []); }) },
       dibujar: function (t) {
